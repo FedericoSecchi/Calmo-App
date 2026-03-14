@@ -1,6 +1,4 @@
-# https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Allow: /
 
-# Sitemap (absolute URL for crawlers)
 Sitemap: https://calmo.fit/sitemap.xml
