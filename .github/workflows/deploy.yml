@@ -36,6 +36,13 @@ jobs:
         env:
           NODE_ENV: production
 
+      - name: Verify sitemap and robots in dist
+        run: |
+          test -f dist/sitemap.xml || (echo "Missing dist/sitemap.xml" && exit 1)
+          test -f dist/robots.txt || (echo "Missing dist/robots.txt" && exit 1)
+          grep -q "https://calmo.fit/sitemap.xml" dist/robots.txt || (echo "robots.txt missing sitemap reference" && exit 1)
+          echo "sitemap.xml and robots.txt OK"
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 

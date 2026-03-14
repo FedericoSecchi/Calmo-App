@@ -20,6 +20,10 @@ const routes = [
   { path: "/case-studies", changefreq: "weekly", priority: "0.8" },
   { path: "/programmatic-seo", changefreq: "monthly", priority: "0.7" },
   { path: "/image-seo", changefreq: "monthly", priority: "0.7" },
+  { path: "/20-20-20-rule", changefreq: "monthly", priority: "0.8" },
+  { path: "/desk-stretch", changefreq: "monthly", priority: "0.8" },
+  { path: "/eye-strain", changefreq: "monthly", priority: "0.8" },
+  { path: "/computer-breaks", changefreq: "monthly", priority: "0.8" },
 ];
 
 const lastmod = new Date().toISOString().split("T")[0];
