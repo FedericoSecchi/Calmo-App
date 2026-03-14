@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calmo - Hábitos saludables para trabajar</title>
+    <script>
+      // SPA fallback for GitHub Pages: serve index.html and pass path for React Router (base: /)
+      var path = window.location.pathname;
+      var search = window.location.search;
+      var hash = window.location.hash;
+      var redirectUrl = '/index.html';
+      if (path !== '/' && path !== '/index.html') {
+        redirectUrl += '?redirect=' + encodeURIComponent(path);
+      }
+      if (search) {
+        redirectUrl += (redirectUrl.indexOf('?') !== -1 ? '&' : '?') + search.slice(1);
+      }
+      if (hash) {
+        redirectUrl += hash;
+      }
+      window.location.replace(redirectUrl);
+    </script>
+  </head>
+  <body>
+    <p>Redirigiendo...</p>
+  </body>
+</html>
