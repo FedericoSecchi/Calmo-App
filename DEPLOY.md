@@ -1,5 +1,20 @@
 # Deploy Calmo to GitHub Pages (calmo.fit)
 
+## Sync Cursor workspace with GitHub
+
+Repository: **https://github.com/FedericoSecchi/Calmo-App**
+
+To ensure all local changes are committed and pushed (and trigger a new deployment):
+
+```bash
+git add -A
+git status                    # review changes
+git commit -m "your message"   # if there are changes
+git push -u origin main
+```
+
+Every push to `main` triggers the GitHub Actions workflow: the app is built and deployed to GitHub Pages (calmo.fit).
+
 ## Prerequisites
 
 - Repository on GitHub
