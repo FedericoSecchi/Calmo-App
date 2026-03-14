@@ -222,6 +222,17 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(state));
   }, [currentPhase, timeRemaining, isRunning, selectedPreset]);
 
+  // App badge when screen break (20-20-20) is active - PWA retention
+  useEffect(() => {
+    const nav = window.navigator as Navigator & { setAppBadge?: (count: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    if (typeof nav.setAppBadge !== "function" || typeof nav.clearAppBadge !== "function") return;
+    if (screenBreak.isOpen) {
+      nav.setAppBadge(1).catch(() => {});
+    } else {
+      nav.clearAppBadge().catch(() => {});
+    }
+  }, [screenBreak.isOpen]);
+
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const phaseTransitionRef = useRef(false);
   const lastTransitionTimestampRef = useRef<number>(0);
@@ -232,7 +243,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     if (Notification.permission === "granted") {
       new Notification(title, {
         body,
-        icon: "/calm-desk-companion/icon-192.png",
+        icon: "/icon-192.png",
       });
     }
     

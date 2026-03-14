@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useSearchParams, Navigate } 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { FocusTimerProvider } from "./contexts/FocusTimerContext";
+import { PWAProvider } from "@/components/PWAProvider";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
@@ -23,6 +24,14 @@ const PortfolioPage = lazy(() => import("./pages/portfolio/PortfolioPage"));
 const CaseStudiesPage = lazy(() => import("./pages/case-studies/CaseStudiesPage"));
 const ProgrammaticSeoPage = lazy(() => import("./pages/programmatic-seo/ProgrammaticSeoPage"));
 const ImageSeoPage = lazy(() => import("./pages/image-seo/ImageSeoPage"));
+const TwentyTwentyRulePage = lazy(() => import("./pages/seo/TwentyTwentyRulePage"));
+const DeskStretchPage = lazy(() => import("./pages/seo/DeskStretchPage"));
+const EyeStrainPage = lazy(() => import("./pages/seo/EyeStrainPage"));
+const ComputerBreaksPage = lazy(() => import("./pages/seo/ComputerBreaksPage"));
+const NeckPainComputerPage = lazy(() => import("./pages/seo/NeckPainComputerPage"));
+const BackPainOfficePage = lazy(() => import("./pages/seo/BackPainOfficePage"));
+const PomodoroBreaksPage = lazy(() => import("./pages/seo/PomodoroBreaksPage"));
+const FocusCyclesPage = lazy(() => import("./pages/seo/FocusCyclesPage"));
 
 const queryClient = new QueryClient();
 
@@ -114,6 +123,7 @@ const App = () => (
         <AuthProvider>
           <Toaster />
           <Sonner />
+          <PWAProvider>
           <BrowserRouter>
             <RedirectHandler />
             <Routes>
@@ -125,6 +135,14 @@ const App = () => (
               <Route path="/case-studies" element={<Suspense fallback={<PageFallback />}><CaseStudiesPage /></Suspense>} />
               <Route path="/programmatic-seo" element={<Suspense fallback={<PageFallback />}><ProgrammaticSeoPage /></Suspense>} />
               <Route path="/image-seo" element={<Suspense fallback={<PageFallback />}><ImageSeoPage /></Suspense>} />
+              <Route path="/20-20-20-rule" element={<Suspense fallback={<PageFallback />}><TwentyTwentyRulePage /></Suspense>} />
+              <Route path="/desk-stretch" element={<Suspense fallback={<PageFallback />}><DeskStretchPage /></Suspense>} />
+              <Route path="/eye-strain" element={<Suspense fallback={<PageFallback />}><EyeStrainPage /></Suspense>} />
+              <Route path="/computer-breaks" element={<Suspense fallback={<PageFallback />}><ComputerBreaksPage /></Suspense>} />
+              <Route path="/neck-pain-computer" element={<Suspense fallback={<PageFallback />}><NeckPainComputerPage /></Suspense>} />
+              <Route path="/back-pain-office" element={<Suspense fallback={<PageFallback />}><BackPainOfficePage /></Suspense>} />
+              <Route path="/pomodoro-breaks" element={<Suspense fallback={<PageFallback />}><PomodoroBreaksPage /></Suspense>} />
+              <Route path="/focus-cycles" element={<Suspense fallback={<PageFallback />}><FocusCyclesPage /></Suspense>} />
               <Route
                 path="/app"
                 element={
@@ -144,6 +162,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
+          </PWAProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
