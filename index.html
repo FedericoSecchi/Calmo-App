@@ -75,6 +75,17 @@
   </head>
 
   <body>
+    <!-- Apply dark mode before React mounts to prevent flash -->
+    <script>
+      (function() {
+        try {
+          var stored = localStorage.getItem('calmo_dark_mode');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var isDark = stored !== null ? stored === 'true' : prefersDark;
+          if (isDark) document.documentElement.classList.add('dark');
+        } catch(e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

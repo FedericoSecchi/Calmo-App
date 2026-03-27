@@ -77,6 +77,17 @@ export function getTodayCount(logs: ActivityLog[]): number {
 }
 
 /**
+ * Get count of activities for the last 7 days
+ */
+export function getWeekCount(logs: ActivityLog[]): number {
+  const now = new Date();
+  const weekAgo = new Date(now);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  weekAgo.setHours(0, 0, 0, 0);
+  return logs.filter((log) => new Date(log.created_at) >= weekAgo).length;
+}
+
+/**
  * Get most recent pain record
  */
 export interface PainRecord {

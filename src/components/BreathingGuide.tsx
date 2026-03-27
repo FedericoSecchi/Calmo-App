@@ -147,11 +147,36 @@ export const BreathingGuide = ({ pattern, onComplete, onClose }: Props) => {
   useEffect(() => {
     if (phase === "complete") {
       if (timerRef.current) clearInterval(timerRef.current);
-      setTimeout(onComplete, 1500);
+      // Auto-dismiss celebration after 2 seconds
+      setTimeout(onComplete, 2000);
     }
   }, [phase, onComplete]);
 
   const phaseConfig = getPhaseConfig(phase, pattern);
+
+  // Pantalla de celebración al completar
+  if (phase === "complete") {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-sm">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 12 }}
+            className="w-24 h-24 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-5"
+          >
+            <span className="text-4xl">✓</span>
+          </motion.div>
+          <h2 className="font-heading text-2xl text-foreground mb-2">¡Bien hecho!</h2>
+          <p className="text-muted-foreground text-sm">{pattern.name} completado</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-sm">
@@ -242,13 +267,11 @@ export const BreathingGuide = ({ pattern, onComplete, onClose }: Props) => {
               exit={{ opacity: 0, y: -10 }}
               className="text-2xl font-heading text-foreground"
             >
-              {phase === "complete" ? "¡Completado!" : phaseConfig.label}
+              {phaseConfig.label}
             </motion.p>
           </AnimatePresence>
           <p className="text-sm text-muted-foreground mt-2">
-            {phase === "complete"
-              ? "Excelente trabajo. Tómate un momento."
-              : isStarted
+            {isStarted
               ? `Ciclo ${Math.min(cycleCount + 1, pattern.totalCycles)} de ${pattern.totalCycles}`
               : pattern.description}
           </p>
@@ -256,19 +279,14 @@ export const BreathingGuide = ({ pattern, onComplete, onClose }: Props) => {
 
         {/* Controls */}
         {!isStarted ? (
-          <Button
-            variant="hero"
-            size="lg"
-            className="w-full"
-            onClick={() => setIsStarted(true)}
-          >
+          <Button variant="hero" size="lg" className="w-full" onClick={() => setIsStarted(true)}>
             Comenzar
           </Button>
-        ) : phase !== "complete" ? (
+        ) : (
           <Button variant="outline" size="lg" className="w-full" onClick={onClose}>
             Detener
           </Button>
-        ) : null}
+        )}
       </motion.div>
     </div>
   );

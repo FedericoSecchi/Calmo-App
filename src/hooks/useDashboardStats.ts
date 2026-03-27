@@ -3,7 +3,7 @@ import { useWaterLogs } from "./useWaterLogs";
 import { useBreakLogs } from "./useBreakLogs";
 import { usePainRecords } from "./usePainRecords";
 import { useManualBreakAdjustments } from "./useManualBreakAdjustments";
-import { calculateStreak, getTodayCount, getLastPain } from "@/lib/stats";
+import { calculateStreak, getTodayCount, getWeekCount, getLastPain } from "@/lib/stats";
 
 export const useDashboardStats = () => {
   const { logs: waterLogs } = useWaterLogs();
@@ -35,6 +35,9 @@ export const useDashboardStats = () => {
     }));
     const lastPain = getLastPain(painForLast);
 
+    const breaksThisWeek = getWeekCount(breakLogs);
+    const waterThisWeek = getWeekCount(waterLogs);
+
     return {
       breaksToday,
       timerBreaksToday,
@@ -42,6 +45,8 @@ export const useDashboardStats = () => {
       waterToday,
       streak,
       lastPain,
+      breaksThisWeek,
+      waterThisWeek,
     };
   }, [breakLogs, waterLogs, painRecords, todayAdjustment]);
 
