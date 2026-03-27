@@ -101,9 +101,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       // Get initial session
       supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsGuest(false); // Clear guest mode if real session exists
+        if (session) {
+          // Real session found – override any guest state
+          setSession(session);
+          setUser(session.user);
+          setIsGuest(false);
+        } else {
+          // No real session – preserve guest mode if the user just signed in as guest
+          // (race condition: getSession resolves after signInAsGuest was called)
+          setSession(null);
+          setUser((prev) => (prev?.id === "guest" ? prev : null));
+          // Do NOT call setIsGuest(false) here – guest state is managed by signInAsGuest
+        }
         setLoading(false);
       }).catch((error) => {
         // Only log errors in development
@@ -118,14 +127,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const {
           data: { subscription: sub },
         } = supabase.auth.onAuthStateChange(async (_event, session) => {
-          setSession(session);
-          setUser(session?.user ?? null);
-          setIsGuest(false); // Clear guest mode when real session is detected
-          setLoading(false);
-
-          // Sync profile on sign in
-          if (session?.user && _event === "SIGNED_IN") {
-            await ensureProfile(session.user.id);
+          if (session) {
+            // Real session – always override (includes guest mode)
+            setSession(session);
+            setUser(session.user);
+            setIsGuest(false);
+            setLoading(false);
+            if (_event === "SIGNED_IN") {
+              await ensureProfile(session.user.id);
+            }
+          } else if (_event === "SIGNED_OUT") {
+            // Explicit sign-out – clear everything including guest mode
+            setSession(null);
+            setUser(null);
+            setIsGuest(false);
+            setLoading(false);
+          } else {
+            // INITIAL_SESSION or TOKEN_REFRESHED with no session –
+            // do NOT clear guest mode (avoids race with signInAsGuest)
+            setLoading(false);
           }
         });
         subscription = sub;
