@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { 
-  Play, 
-  Clock, 
+import {
+  Play,
+  Clock,
   Check,
   X,
   Activity,
@@ -12,6 +12,7 @@ import {
   Brain
 } from "lucide-react";
 import { ExercisePlayer } from "@/components/ExercisePlayer";
+import { BreathingGuide, breathingPatterns, type BreathingPattern } from "@/components/BreathingGuide";
 import { getExerciseById } from "@/lib/exercises";
 import { Exercise as ExerciseType } from "@/lib/exerciseTypes";
 
@@ -128,16 +129,25 @@ const stretchExercises: ExerciseDisplay[] = [
 
 const breathingExercises: ExerciseDisplay[] = [
   {
-    id: "b1",
+    id: "b-478",
     name: "Respiración 4-7-8",
     duration: "2 min",
     area: "general",
     difficulty: "easy",
-    description: "Técnica de respiración para calmar la mente y reducir el estrés",
+    description: "Técnica de respiración para calmar el sistema nervioso y reducir el estrés",
     category: "breathing",
   },
   {
-    id: "b2",
+    id: "b-box",
+    name: "Respiración cuadrada",
+    duration: "2 min",
+    area: "general",
+    difficulty: "easy",
+    description: "Respiración en caja para mejorar la concentración y el foco",
+    category: "breathing",
+  },
+  {
+    id: "b-deep",
     name: "Respiración profunda",
     duration: "3 min",
     area: "general",
@@ -147,17 +157,30 @@ const breathingExercises: ExerciseDisplay[] = [
   },
 ];
 
+// Map breathing exercise IDs to breathing patterns
+const breathingIdToPatternId: Record<string, string> = {
+  "b-478": "478",
+  "b-box": "box",
+  "b-deep": "deep",
+};
+
 const Exercises = () => {
   const [selectedExercise, setSelectedExercise] = useState<ExerciseDisplay | null>(null);
   const [playingExercise, setPlayingExercise] = useState<ExerciseType | null>(null);
+  const [playingBreathing, setPlayingBreathing] = useState<BreathingPattern | null>(null);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
 
   const handleStartExercise = (exercise: ExerciseDisplay) => {
     if (exercise.category === "breathing") {
-      // Breathing exercises are placeholders for now
+      const patternId = breathingIdToPatternId[exercise.id];
+      const pattern = breathingPatterns.find((p) => p.id === patternId);
+      if (pattern) {
+        setPlayingBreathing(pattern);
+        setSelectedExercise(null);
+      }
       return;
     }
-    
+
     if (exercise.engineId) {
       const engineExercise = getExerciseById(exercise.engineId);
       if (engineExercise) {
@@ -174,6 +197,18 @@ const Exercises = () => {
       }
     }
     setPlayingExercise(null);
+  };
+
+  const handleBreathingComplete = () => {
+    if (playingBreathing) {
+      const displayId = Object.entries(breathingIdToPatternId).find(
+        ([, patternId]) => patternId === playingBreathing.id
+      )?.[0];
+      if (displayId && !completedExercises.includes(displayId)) {
+        setCompletedExercises([...completedExercises, displayId]);
+      }
+    }
+    setPlayingBreathing(null);
   };
 
   const handleExerciseClose = () => {
@@ -295,7 +330,7 @@ const Exercises = () => {
         "Meditación",
         <Brain className="h-5 w-5 text-primary" />,
         [],
-        true // Placeholder
+        true
       )}
 
       {/* Exercise Modal */}
@@ -334,7 +369,14 @@ const Exercises = () => {
               {selectedExercise.description}
             </p>
             
-            {selectedExercise.category !== "breathing" && (
+            {selectedExercise.category === "breathing" ? (
+              <div className="bg-muted rounded-xl p-4 mb-6">
+                <h3 className="font-medium text-foreground mb-2">Cómo funciona:</h3>
+                <p className="text-sm text-muted-foreground">
+                  Una guía animada te llevará paso a paso por el ejercicio de respiración. Solo sigue el círculo que se expande y contrae.
+                </p>
+              </div>
+            ) : (
               <div className="bg-muted rounded-xl p-4 mb-6">
                 <h3 className="font-medium text-foreground mb-2">Instrucciones:</h3>
                 <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
@@ -354,31 +396,21 @@ const Exercises = () => {
             </div>
             
             <div className="flex gap-3">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="flex-1"
                 onClick={() => setSelectedExercise(null)}
               >
                 Cancelar
               </Button>
-              {selectedExercise.category === "breathing" ? (
-                <Button 
-                  variant="outline" 
-                  className="flex-1"
-                  disabled
-                >
-                  Próximamente
-                </Button>
-              ) : (
-                <Button 
-                  variant="hero" 
-                  className="flex-1"
-                  onClick={() => handleStartExercise(selectedExercise)}
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Empezar ejercicio
-                </Button>
-              )}
+              <Button
+                variant="hero"
+                className="flex-1"
+                onClick={() => handleStartExercise(selectedExercise)}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Empezar
+              </Button>
             </div>
           </motion.div>
         </div>
@@ -390,6 +422,15 @@ const Exercises = () => {
           exercise={playingExercise}
           onComplete={handleExerciseComplete}
           onClose={handleExerciseClose}
+        />
+      )}
+
+      {/* Breathing Guide */}
+      {playingBreathing && (
+        <BreathingGuide
+          pattern={playingBreathing}
+          onComplete={handleBreathingComplete}
+          onClose={() => setPlayingBreathing(null)}
         />
       )}
     </div>

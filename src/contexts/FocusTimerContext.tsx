@@ -32,6 +32,14 @@ export interface PresetConfig {
   restMinutes: number;
 }
 
+export interface ScreenBreakState {
+  isOpen: boolean;
+  countdownSeconds: number;
+  lastTriggerWorkElapsed: number;
+  snoozed: boolean;
+  snoozeTargetWorkElapsed: number | null;
+}
+
 export const presets: PresetConfig[] = [
   { id: "light", name: "Ritmo Suave", interval: "60 min", description: "60 min trabajo · 10 min descanso", workMinutes: 60, restMinutes: 10 },
   { id: "standard", name: "Ritmo Balanceado", interval: "45 min", description: "45 min trabajo · 5 min descanso", workMinutes: 45, restMinutes: 5 },

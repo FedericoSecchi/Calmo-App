@@ -182,6 +182,13 @@ const Pain = () => {
         </motion.div>
       )}
 
+      {isLoading && (
+        <div className="flex items-center justify-center py-6 text-muted-foreground mb-4">
+          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+          <span className="text-sm">Cargando historial...</span>
+        </div>
+      )}
+
       <div className="space-y-8">
         <div className="bg-card rounded-2xl p-6 border border-border/50">
           <label className="font-medium text-foreground mb-4 block">Nivel de dolor: {painLevel}/10</label>
@@ -226,12 +233,6 @@ const Pain = () => {
         </Button>
       </div>
 
-      {isLoading && (
-        <div className="text-center text-muted-foreground py-8">
-          <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-          Cargando historial...
-        </div>
-      )}
     </div>
   );
 };
