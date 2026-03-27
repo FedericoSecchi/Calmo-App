@@ -1,14 +1,14 @@
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { 
+import {
   Home,
-  Dumbbell, 
-  Activity, 
+  Dumbbell,
+  Activity,
   Settings,
   Play,
-  Pause
+  Pause,
+  Bell
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { EndOfFocusDialog } from "@/components/EndOfFocusDialog";
@@ -21,7 +21,7 @@ import { useFocusTimer } from "@/contexts/FocusTimerContext";
 const bottomNavItems = [
   { to: "/app", icon: Home, label: "Inicio", end: true },
   { to: "/app/exercises", icon: Dumbbell, label: "Ejercicios" },
-  null, // Slot central reservado para FAB
+  null, // Slot central reservado para FAB (timer play/pause)
   { to: "/app/pain", icon: Activity, label: "Dolor" },
   { to: "/app/settings", icon: Settings, label: "Ajustes" },
 ];
@@ -32,35 +32,15 @@ const AppLayout = () => {
   const { isGuest, user } = useAuth();
   
   // useFocusTimer is safe here because AppLayout is wrapped by FocusTimerProvider in App.tsx
-  const { 
-    showEndOfFocusDialog, 
+  const {
+    showEndOfFocusDialog,
     dismissEndOfFocusDialog,
-    isRunning = false,
-    timeRemaining = 0,
+    isRunning,
+    timeRemaining,
     formatTime,
-    toggleTimer
+    toggleTimer,
+    currentPhase,
   } = useFocusTimer();
-
-  // Defensive: ensure formatTime exists and handles edge cases
-  const safeFormatTime = (seconds: number | undefined | null): string => {
-    if (formatTime && typeof formatTime === 'function') {
-      return formatTime(seconds ?? 0);
-    }
-    // Fallback formatter
-    const safeSeconds = Math.max(0, seconds ?? 0);
-    const mins = Math.floor(safeSeconds / 60);
-    const secs = safeSeconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Defensive: ensure toggleTimer exists
-  const safeToggleTimer = () => {
-    if (toggleTimer && typeof toggleTimer === 'function') {
-      toggleTimer();
-    } else if (import.meta.env.DEV) {
-      console.warn("[AppLayout] toggleTimer not available");
-    }
-  };
 
   // Get user initials for avatar
   const getUserInitials = () => {
@@ -131,37 +111,38 @@ const AppLayout = () => {
             if (item === null) {
               return (
                 <div key="fab-slot" className="relative flex items-center justify-center h-full">
-                  {/* FAB - ÚNICO control del timer (play/pause) */}
+                  {/* FAB - control del timer (play/pause) + acceso a Reminders */}
                   <div className="absolute -top-6 z-10">
                     <button
                       onClick={() => {
-                        safeToggleTimer();
+                        toggleTimer();
                         navigate("/app/reminders");
                       }}
                       className={cn(
                         "flex flex-col items-center justify-center",
                         "w-16 h-16 rounded-full min-w-[44px] min-h-[44px]",
-                        "bg-primary text-primary-foreground",
+                        currentPhase === "rest"
+                          ? "bg-secondary text-secondary-foreground"
+                          : "bg-primary text-primary-foreground",
                         "shadow-xl shadow-primary/30",
                         "transition-transform active:scale-95",
                         "border-4 border-background",
                         "touch-manipulation"
                       )}
-                      aria-label={isRunning ? `Pausar timer. ${safeFormatTime(timeRemaining)} restantes.` : `Iniciar timer. ${safeFormatTime(timeRemaining)} restantes.`}
-                      disabled={!toggleTimer}
+                      aria-label={isRunning ? `Pausar timer. ${formatTime(timeRemaining)} restantes.` : `Iniciar timer. ${formatTime(timeRemaining)} restantes.`}
                     >
                       {isRunning ? (
                         <>
                           <Pause className="h-6 w-6 mb-0.5" />
                           <span className="text-[9px] font-bold leading-tight">
-                            {safeFormatTime(timeRemaining)}
+                            {formatTime(timeRemaining)}
                           </span>
                         </>
                       ) : (
                         <>
                           <Play className="h-6 w-6 mb-0.5" />
                           <span className="text-[9px] font-bold leading-tight">
-                            {safeFormatTime(timeRemaining)}
+                            {formatTime(timeRemaining)}
                           </span>
                         </>
                       )}

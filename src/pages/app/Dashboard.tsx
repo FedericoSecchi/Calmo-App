@@ -1,16 +1,17 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { 
-  Activity, 
-  Droplets, 
-  Play, 
+import {
+  Activity,
+  Droplets,
+  Play,
   Target,
   Plus,
   Minus,
   Loader2,
   Clock,
   Pause,
-  Brain
+  Brain,
+  SkipForward
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
@@ -25,31 +26,18 @@ const Dashboard = () => {
   const stats = useDashboardStats();
   const { addWaterGlass, removeWaterGlass, isAdding: isAddingWater } = useWaterLogs();
   const { adjustToday } = useManualBreakAdjustments();
-  const { 
-    isRunning = false, 
-    timeRemaining = 0, 
-    currentPhase = "work", 
-    selectedPreset = "standard", 
-    formatTime, 
-    getPresetConfig 
+  const {
+    isRunning,
+    timeRemaining,
+    currentPhase,
+    selectedPreset,
+    formatTime,
+    getPresetConfig,
+    toggleTimer,
+    skipToNextPhase,
   } = useFocusTimer();
-  
-  // Defensive: ensure formatTime exists and handles edge cases
-  const safeFormatTime = (seconds: number | undefined | null): string => {
-    if (formatTime && typeof formatTime === 'function') {
-      return formatTime(seconds ?? 0);
-    }
-    // Fallback formatter
-    const safeSeconds = Math.max(0, seconds ?? 0);
-    const mins = Math.floor(safeSeconds / 60);
-    const secs = safeSeconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-  
-  // Get preset config (getPresetConfig has built-in fallback to standard)
-  const currentPreset = (getPresetConfig && typeof getPresetConfig === 'function') 
-    ? getPresetConfig(selectedPreset) 
-    : { name: "Ritmo Balanceado", workMinutes: 45, restMinutes: 5 };
+
+  const currentPreset = getPresetConfig(selectedPreset);
 
   const handleAddWater = () => {
     addWaterGlass();
@@ -119,7 +107,7 @@ const Dashboard = () => {
               )}
             </div>
             <p className="text-4xl font-bold text-foreground mb-2">
-              {safeFormatTime(timeRemaining)}
+              {formatTime(timeRemaining)}
             </p>
             <p className={`text-lg font-medium mb-1 ${
               isRunning ? "text-primary" : "text-muted-foreground"
@@ -127,8 +115,33 @@ const Dashboard = () => {
               {isRunning ? "Estás en foco" : "En pausa"}
             </p>
             <p className="text-sm text-muted-foreground">
-              {currentPreset?.name || "Ritmo Balanceado"} • {currentPhase === "work" ? "Trabajo" : "Descanso"}
+              {currentPreset.name} • {currentPhase === "work" ? "Trabajo" : "Descanso"}
             </p>
+            <div className="flex items-center gap-3 mt-5">
+              <button
+                onClick={skipToNextPhase}
+                className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground"
+                title={currentPhase === "work" ? "Saltar al descanso" : "Finalizar descanso"}
+                aria-label={currentPhase === "work" ? "Saltar al descanso" : "Finalizar descanso"}
+              >
+                <SkipForward className="h-5 w-5" />
+              </button>
+              <button
+                onClick={toggleTimer}
+                className={`flex items-center gap-2 px-5 py-2 rounded-xl font-medium text-sm transition-colors ${
+                  isRunning
+                    ? "bg-muted text-foreground hover:bg-muted/80"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                }`}
+                aria-label={isRunning ? "Pausar timer" : "Iniciar timer"}
+              >
+                {isRunning ? (
+                  <><Pause className="h-4 w-4" /> Pausar</>
+                ) : (
+                  <><Play className="h-4 w-4" /> Iniciar</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </motion.div>
