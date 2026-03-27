@@ -33,6 +33,7 @@ export const ExercisePlayer = ({ exercise, onComplete, onClose }: ExercisePlayer
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [showPreAlert, setShowPreAlert] = useState(true);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [state, setState] = useState<ExerciseState>(() => {
     const firstStep = exercise.steps[0];
     return {
@@ -91,20 +92,23 @@ export const ExercisePlayer = ({ exercise, onComplete, onClose }: ExercisePlayer
     }
   }, []);
 
+  const triggerCompletion = useCallback(() => {
+    playStepSound(false);
+    setShowCelebration(true);
+    setTimeout(() => {
+      setShowCelebration(false);
+      onComplete();
+    }, 2000);
+  }, [onComplete, playStepSound]);
+
   // Handle step completion
   const advanceStep = useCallback(() => {
     setState((prev) => {
       const nextIndex = prev.currentStepIndex + 1;
-      
+
       // Check if exercise is complete
       if (nextIndex >= prev.exercise.steps.length || prev.totalTimeRemaining <= 0) {
-        // Exercise complete
-        playStepSound(false); // Soft end sound
-        toast({
-          title: "Buen trabajo",
-          description: "Volvemos al descanso",
-        });
-        onComplete();
+        triggerCompletion();
         return prev;
       }
 
@@ -122,7 +126,7 @@ export const ExercisePlayer = ({ exercise, onComplete, onClose }: ExercisePlayer
         stepTimeRemaining: stepDuration,
       };
     });
-  }, [exercise.steps, onComplete, playStepSound, toast]);
+  }, [exercise.steps, triggerCompletion, playStepSound]);
 
   // Ref to track if step completion has been handled (prevents double-triggering)
   const stepCompletedRef = useRef(false);
@@ -162,14 +166,7 @@ export const ExercisePlayer = ({ exercise, onComplete, onClose }: ExercisePlayer
             clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
-          playStepSound(false);
-          toast({
-            title: "Buen trabajo",
-            description: "Volvemos al descanso",
-          });
-          setTimeout(() => {
-            onComplete();
-          }, 500);
+          triggerCompletion();
         }
       }, 100);
     } else {
@@ -232,6 +229,30 @@ export const ExercisePlayer = ({ exercise, onComplete, onClose }: ExercisePlayer
     ? ((currentStep.durationSeconds - state.stepTimeRemaining) / currentStep.durationSeconds) * 100
     : 0;
   const totalProgress = ((exercise.targetDurationSeconds - state.totalTimeRemaining) / exercise.targetDurationSeconds) * 100;
+
+  // Celebration screen
+  if (showCelebration) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-sm">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center text-center"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 12 }}
+            className="w-24 h-24 rounded-full bg-success/10 flex items-center justify-center mb-6"
+          >
+            <span className="text-4xl text-success font-heading">✓</span>
+          </motion.div>
+          <h2 className="font-heading text-2xl text-foreground mb-2">¡Bien hecho!</h2>
+          <p className="text-muted-foreground text-sm">{exercise.name} completado</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   // Pre-alert screen (before exercise starts)
   if (showPreAlert) {

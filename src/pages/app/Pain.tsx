@@ -16,23 +16,32 @@ const painAreas = [
   { id: "shoulders", label: "Hombros" },
 ];
 
+const getPainColor = (level: number) => {
+  if (level <= 3) return "text-success";
+  if (level <= 6) return "text-amber-500";
+  return "text-destructive";
+};
+
 const Pain = () => {
   const { toast } = useToast();
   const { isGuest } = useAuth();
   const [painLevel, setPainLevel] = useState(5);
-  const [selectedArea, setSelectedArea] = useState("");
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
   const [note, setNote] = useState("");
   const [daysFilter, setDaysFilter] = useState(30);
   const [localRecords, setLocalRecords] = useState<Array<{ date: string; intensity: number }>>([]);
 
-  // Use Supabase hook for authenticated users, local state for guests
-  const { records, isLoading, createRecord, isCreating, createError } = usePainRecords(daysFilter);
+  const { records, isLoading, createRecord, isCreating } = usePainRecords(daysFilter);
 
-  // Aggregate records by day (average intensity per day)
+  const toggleArea = (id: string) => {
+    setSelectedAreas((prev) =>
+      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
+    );
+  };
+
   const chartData = useMemo(() => {
     const dataSource = isGuest ? localRecords : records;
-    
-    // Group by date and calculate average
+
     const grouped = dataSource.reduce((acc, record) => {
       const date = formatDateToYYYYMMDD(record.created_at || record.date);
       if (!acc[date]) {
@@ -42,22 +51,21 @@ const Pain = () => {
       return acc;
     }, {} as Record<string, { date: string; intensities: number[] }>);
 
-    // Calculate daily averages and sort by date
     return Object.entries(grouped)
       .map(([dateStr, { intensities }]) => ({
-        dateStr, // Keep original date string for sorting
+        dateStr,
         date: new Date(dateStr).toLocaleDateString("es-ES", { month: "short", day: "numeric" }),
-        intensity: Math.round(intensities.reduce((a, b) => a + b, 0) / intensities.length * 10) / 10,
+        intensity: Math.round((intensities.reduce((a, b) => a + b, 0) / intensities.length) * 10) / 10,
       }))
       .sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime())
-      .map(({ date, intensity }) => ({ date, intensity })); // Remove dateStr from final output
+      .map(({ date, intensity }) => ({ date, intensity }));
   }, [records, localRecords, isGuest]);
 
   const handleSubmit = async () => {
-    if (!selectedArea) {
+    if (selectedAreas.length === 0) {
       toast({
         title: "Campo requerido",
-        description: "Por favor selecciona una zona afectada",
+        description: "Por favor selecciona al menos una zona afectada",
         variant: "destructive",
       });
       return;
@@ -74,34 +82,28 @@ const Pain = () => {
 
     try {
       if (isGuest) {
-        // For guest mode, store locally
         setLocalRecords([
           ...localRecords,
-          {
-            date: new Date().toISOString(),
-            intensity: painLevel,
-          },
+          { date: new Date().toISOString(), intensity: painLevel },
         ]);
         toast({
           title: "Registro guardado (modo invitado)",
-          description: `Dolor nivel ${painLevel} en ${selectedArea}`,
+          description: `Dolor nivel ${painLevel} en ${selectedAreas.join(", ")}`,
         });
       } else {
-        // For authenticated users, save to Supabase
-        await createRecord({
-          area: selectedArea,
-          intensity: painLevel,
-          notes: note || undefined,
-        });
+        await Promise.all(
+          selectedAreas.map((area) =>
+            createRecord({ area, intensity: painLevel, notes: note || undefined })
+          )
+        );
         toast({
           title: "Registro guardado",
-          description: `Dolor nivel ${painLevel} en ${selectedArea}`,
+          description: `Dolor nivel ${painLevel} en ${selectedAreas.length > 1 ? `${selectedAreas.length} zonas` : selectedAreas[0]}`,
         });
       }
 
-      // Reset form
       setPainLevel(5);
-      setSelectedArea("");
+      setSelectedAreas([]);
       setNote("");
     } catch (error) {
       toast({
@@ -117,26 +119,27 @@ const Pain = () => {
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-[420px] md:max-w-[520px] lg:max-w-[640px] mx-auto">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
         <h1 className="font-heading text-2xl lg:text-3xl text-foreground">Registrar dolor</h1>
-        <p className="text-muted-foreground mt-1">¿Cómo te sientes hoy?</p>
+        <p className="text-muted-foreground mt-1 text-sm">¿Cómo te sientes hoy?</p>
       </motion.div>
 
       {/* Chart Section */}
       {chartData.length > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8 bg-card rounded-2xl p-6 border border-border/50"
+          transition={{ delay: 0.05 }}
+          className="mb-6 bg-card rounded-2xl p-5 border border-border/30"
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-heading text-lg text-foreground">Historial de dolor</h2>
-            <div className="flex gap-2">
+            <h2 className="font-heading text-base text-foreground">Historial</h2>
+            <div className="flex gap-1.5">
               {[7, 14, 30].map((days) => (
                 <button
                   key={days}
                   onClick={() => setDaysFilter(days)}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                     daysFilter === days
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -147,25 +150,29 @@ const Pain = () => {
               ))}
             </div>
           </div>
-          <div className="h-64">
+          <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis
                   dataKey="date"
-                  className="text-xs"
-                  tick={{ fill: "currentColor" }}
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <YAxis
                   domain={[0, 10]}
-                  className="text-xs"
-                  tick={{ fill: "currentColor" }}
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={20}
                 />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
-                    borderRadius: "0.5rem",
+                    borderRadius: "0.75rem",
+                    fontSize: "12px",
                   }}
                 />
                 <Line
@@ -173,8 +180,8 @@ const Pain = () => {
                   dataKey="intensity"
                   stroke="hsl(var(--primary))"
                   strokeWidth={2}
-                  dot={{ fill: "hsl(var(--primary))", r: 4 }}
-                  activeDot={{ r: 6 }}
+                  dot={{ fill: "hsl(var(--primary))", r: 3, strokeWidth: 0 }}
+                  activeDot={{ r: 5 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -183,56 +190,110 @@ const Pain = () => {
       )}
 
       {isLoading && (
-        <div className="flex items-center justify-center py-6 text-muted-foreground mb-4">
-          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+        <div className="flex items-center justify-center py-4 text-muted-foreground mb-4">
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
           <span className="text-sm">Cargando historial...</span>
         </div>
       )}
 
-      <div className="space-y-8">
-        <div className="bg-card rounded-2xl p-6 border border-border/50">
-          <label className="font-medium text-foreground mb-4 block">Nivel de dolor: {painLevel}/10</label>
-          <input type="range" min="1" max="10" value={painLevel} onChange={(e) => setPainLevel(Number(e.target.value))} className="w-full accent-primary" />
-          <div className="flex justify-between text-xs text-muted-foreground mt-2">
-            <span>Sin dolor</span><span>Dolor intenso</span>
+      <div className="space-y-4">
+        {/* Pain Level */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-card rounded-2xl p-5 border border-border/30"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <label className="font-medium text-sm text-foreground">Nivel de dolor</label>
+            <span className={`text-2xl font-heading ${getPainColor(painLevel)}`}>{painLevel}<span className="text-sm text-muted-foreground font-normal">/10</span></span>
           </div>
-        </div>
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={painLevel}
+            onChange={(e) => setPainLevel(Number(e.target.value))}
+            className="w-full accent-primary"
+          />
+          <div className="flex justify-between text-xs text-muted-foreground mt-2">
+            <span>Sin dolor</span>
+            <span>Dolor intenso</span>
+          </div>
+        </motion.div>
 
-        <div className="bg-card rounded-2xl p-6 border border-border/50">
-          <label className="font-medium text-foreground mb-4 block">Zona afectada</label>
+        {/* Area Selection (multi-select) */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          className="bg-card rounded-2xl p-5 border border-border/30"
+        >
+          <label className="font-medium text-sm text-foreground mb-3 block">
+            Zona afectada
+            {selectedAreas.length > 1 && (
+              <span className="ml-2 text-xs text-muted-foreground font-normal">({selectedAreas.length} seleccionadas)</span>
+            )}
+          </label>
           <div className="grid grid-cols-2 gap-2">
             {painAreas.map((area) => (
-              <button key={area.id} onClick={() => setSelectedArea(area.id)} className={`p-3 rounded-xl border-2 transition-all ${selectedArea === area.id ? "border-primary bg-primary/5" : "border-border"}`}>
+              <button
+                key={area.id}
+                onClick={() => toggleArea(area.id)}
+                className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                  selectedAreas.includes(area.id)
+                    ? "border-primary bg-primary/5 text-foreground"
+                    : "border-border text-muted-foreground hover:border-border/80"
+                }`}
+              >
                 {area.label}
-                {selectedArea === area.id && <Check className="h-4 w-4 inline ml-2 text-primary" />}
+                {selectedAreas.includes(area.id) && (
+                  <Check className="h-3.5 w-3.5 inline ml-2 text-primary" />
+                )}
               </button>
             ))}
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-card rounded-2xl p-6 border border-border/50">
-          <label className="font-medium text-foreground mb-4 block">Nota (opcional)</label>
-          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="¿Qué estabas haciendo?" className="resize-none" />
-        </div>
-
-        <Button
-          variant="hero"
-          size="lg"
-          className="w-full"
-          onClick={handleSubmit}
-          disabled={isCreating}
+        {/* Note */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.14 }}
+          className="bg-card rounded-2xl p-5 border border-border/30"
         >
-          {isCreating ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            "Guardar registro"
-          )}
-        </Button>
-      </div>
+          <label className="font-medium text-sm text-foreground mb-3 block">Nota (opcional)</label>
+          <Textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="¿Qué estabas haciendo?"
+            className="resize-none border-0 bg-muted/50 focus-visible:ring-0"
+          />
+        </motion.div>
 
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.16 }}
+        >
+          <Button
+            variant="hero"
+            size="lg"
+            className="w-full"
+            onClick={handleSubmit}
+            disabled={isCreating}
+          >
+            {isCreating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              "Guardar registro"
+            )}
+          </Button>
+        </motion.div>
+      </div>
     </div>
   );
 };
