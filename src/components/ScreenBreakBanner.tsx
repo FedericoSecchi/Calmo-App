@@ -13,15 +13,13 @@ import { useFocusTimer } from "@/contexts/FocusTimerContext";
 export const ScreenBreakBanner = () => {
   const { screenBreak, dismissScreenBreak, snoozeScreenBreak, currentPhase, isRunning } = useFocusTimer();
 
-  // Only show during WORK phase
-  if (!screenBreak.isOpen || currentPhase !== "work") {
-    return null;
-  }
+  const shouldShow = screenBreak.isOpen && currentPhase === "work";
 
   return (
     <AnimatePresence>
-      {screenBreak.isOpen && (
+      {shouldShow && (
         <motion.div
+          key="screen-break-banner"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}

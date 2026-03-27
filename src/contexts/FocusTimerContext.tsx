@@ -46,6 +46,14 @@ interface TimerState {
   presetId: PresetId;
 }
 
+interface ScreenBreakState {
+  isOpen: boolean;
+  countdownSeconds: number;
+  lastTriggerWorkElapsed: number;
+  snoozed: boolean;
+  snoozeTargetWorkElapsed: number | null;
+}
+
 interface FocusTimerContextType {
   // State
   currentPhase: TimerPhase;

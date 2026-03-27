@@ -51,9 +51,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (selectError && selectError.code !== "PGRST116") {
         // PGRST116 = no rows returned, which is expected if profile doesn't exist
         if (import.meta.env.DEV) {
-          if (import.meta.env.DEV) {
-            console.warn("Error checking profile:", selectError);
-          }
+          console.warn("Error checking profile:", selectError);
         }
       }
 
@@ -151,9 +149,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         } catch (error) {
           // Ignore unsubscribe errors
           if (import.meta.env.DEV) {
-            if (import.meta.env.DEV) {
-              console.warn("Error unsubscribing from auth:", error);
-            }
+            console.warn("Error unsubscribing from auth:", error);
           }
         }
       }
@@ -162,7 +158,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signIn = async (email: string, password: string) => {
     if (!isSupabaseConfigured) {
-      return { error: { message: "Supabase is not configured", name: "ConfigurationError" } as AuthError };
+      return { data: null, error: { message: "Supabase is not configured", name: "ConfigurationError" } as AuthError };
     }
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -185,7 +181,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signUp = async (email: string, password: string) => {
     if (!isSupabaseConfigured) {
-      return { error: { message: "Supabase is not configured", name: "ConfigurationError" } as AuthError };
+      return { data: null, error: { message: "Supabase is not configured", name: "ConfigurationError" } as AuthError };
     }
     const { data, error } = await supabase.auth.signUp({
       email,
