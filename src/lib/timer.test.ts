@@ -27,11 +27,11 @@ describe("presets", () => {
     expect(focus.restMinutes).toBe(10);
   });
 
-  it("all presets have names and descriptions", () => {
+  it("all presets have an id and valid minute values", () => {
     for (const preset of presets) {
-      expect(preset.name).toBeTruthy();
-      expect(preset.description).toBeTruthy();
-      expect(preset.interval).toBeTruthy();
+      expect(preset.id).toBeTruthy();
+      expect(preset.workMinutes).toBeGreaterThan(0);
+      expect(preset.restMinutes).toBeGreaterThan(0);
     }
   });
 });

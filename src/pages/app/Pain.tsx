@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Loader2, ShieldCheck } from "lucide-react";
+import { Check, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePainRecords } from "@/hooks/usePainRecords";
 import { formatDateToYYYYMMDD } from "@/lib/utils";
@@ -10,12 +10,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useT } from "@/lib/i18n";
 import { track } from "@/lib/analytics";
 
-const painAreas = [
-  { id: "lumbar", labelEn: "Lower back", labelEs: "Lumbar" },
-  { id: "cervical", labelEn: "Neck", labelEs: "Cuello" },
-  { id: "wrist", labelEn: "Wrists", labelEs: "Muñecas" },
-  { id: "shoulders", labelEn: "Shoulders", labelEs: "Hombros" },
-];
+const painAreaIds = ["lumbar", "cervical", "wrist", "shoulders"] as const;
+type PainAreaId = (typeof painAreaIds)[number];
 
 const getPainColor = (level: number) => {
   if (level <= 3) return "text-success";
@@ -26,13 +22,14 @@ const getPainColor = (level: number) => {
 const Pain = () => {
   const { toast } = useToast();
   const { t, lang } = useT();
+  const p = t.app.pain;
   const [painLevel, setPainLevel] = useState(5);
-  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [selectedAreas, setSelectedAreas] = useState<PainAreaId[]>([]);
   const [note, setNote] = useState("");
   const [daysFilter, setDaysFilter] = useState(30);
   const { records, createRecord } = usePainRecords(daysFilter);
 
-  const toggleArea = (id: string) => {
+  const toggleArea = (id: PainAreaId) => {
     setSelectedAreas((prev) => (prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]));
   };
 
@@ -47,7 +44,10 @@ const Pain = () => {
     return Object.entries(grouped)
       .map(([dateStr, { intensities }]) => ({
         dateStr,
-        date: new Date(dateStr).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { month: "short", day: "numeric" }),
+        date: new Date(dateStr).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", {
+          month: "short",
+          day: "numeric",
+        }),
         intensity: Math.round((intensities.reduce((a, b) => a + b, 0) / intensities.length) * 10) / 10,
       }))
       .sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime())
@@ -56,39 +56,27 @@ const Pain = () => {
 
   const handleSubmit = () => {
     if (selectedAreas.length === 0) {
-      toast({ title: lang === "es" ? "Elegí al menos una zona" : "Pick at least one area", variant: "destructive" });
+      toast({ title: p.toasts.areaRequired, variant: "destructive" });
       return;
     }
     selectedAreas.forEach((area) => createRecord({ area, intensity: painLevel, notes: note || undefined }));
     track("pain_logged", { areas: selectedAreas.length });
-    toast({ title: lang === "es" ? "Registro guardado" : "Saved" });
+    toast({ title: p.toasts.saved });
     setPainLevel(5);
     setSelectedAreas([]);
     setNote("");
   };
 
-  const title = lang === "es" ? "Registrar dolor" : "Log your pain";
-  const subtitle = lang === "es" ? "¿Cómo te sentís hoy?" : "How are you feeling today?";
-  const levelLabel = lang === "es" ? "Nivel de dolor" : "Pain level";
-  const areaLabel = lang === "es" ? "Zona afectada" : "Area";
-  const noteLabel = lang === "es" ? "Nota (opcional)" : "Note (optional)";
-  const notePh = lang === "es" ? "¿Qué estabas haciendo?" : "What were you doing?";
-  const saveLabel = lang === "es" ? "Guardar registro" : "Save entry";
-  const painMin = lang === "es" ? "Sin dolor" : "No pain";
-  const painMax = lang === "es" ? "Dolor intenso" : "Intense pain";
-  const historyLabel = lang === "es" ? "Historial" : "History";
-  const selectedPostfix = lang === "es" ? "seleccionadas" : "selected";
-
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-[420px] md:max-w-[520px] lg:max-w-[640px] mx-auto">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="font-heading text-2xl lg:text-3xl text-foreground">{title}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{subtitle}</p>
+        <h1 className="font-heading text-2xl lg:text-3xl text-foreground">{p.title}</h1>
+        <p className="text-muted-foreground mt-1 text-sm">{p.subtitle}</p>
       </motion.div>
 
       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-6 bg-muted/40 border border-border/40 rounded-xl px-3 py-2">
         <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-        <span>{t.app.pain.localNote}</span>
+        <span>{p.localNote}</span>
       </div>
 
       {chartData.length > 0 && (
@@ -99,7 +87,7 @@ const Pain = () => {
           className="mb-6 bg-card rounded-2xl p-5 border border-border/30"
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-heading text-base text-foreground">{historyLabel}</h2>
+            <h2 className="font-heading text-base text-foreground">{p.historyLabel}</h2>
             <div className="flex gap-1.5">
               {[7, 14, 30].map((days) => (
                 <button
@@ -163,7 +151,7 @@ const Pain = () => {
           className="bg-card rounded-2xl p-5 border border-border/30"
         >
           <div className="flex items-center justify-between mb-4">
-            <label className="font-medium text-sm text-foreground">{levelLabel}</label>
+            <label className="font-medium text-sm text-foreground">{p.levelLabel}</label>
             <span className={`text-2xl font-heading ${getPainColor(painLevel)}`}>
               {painLevel}
               <span className="text-sm text-muted-foreground font-normal">/10</span>
@@ -176,11 +164,11 @@ const Pain = () => {
             value={painLevel}
             onChange={(e) => setPainLevel(Number(e.target.value))}
             className="w-full accent-primary"
-            aria-label={levelLabel}
+            aria-label={p.levelLabel}
           />
           <div className="flex justify-between text-xs text-muted-foreground mt-2">
-            <span>{painMin}</span>
-            <span>{painMax}</span>
+            <span>{p.noPain}</span>
+            <span>{p.intensePain}</span>
           </div>
         </motion.div>
 
@@ -191,26 +179,26 @@ const Pain = () => {
           className="bg-card rounded-2xl p-5 border border-border/30"
         >
           <label className="font-medium text-sm text-foreground mb-3 block">
-            {areaLabel}
+            {p.areaLabel}
             {selectedAreas.length > 1 && (
               <span className="ml-2 text-xs text-muted-foreground font-normal">
-                ({selectedAreas.length} {selectedPostfix})
+                ({selectedAreas.length} {p.selectedPostfix})
               </span>
             )}
           </label>
           <div className="grid grid-cols-2 gap-2">
-            {painAreas.map((area) => (
+            {painAreaIds.map((areaId) => (
               <button
-                key={area.id}
-                onClick={() => toggleArea(area.id)}
+                key={areaId}
+                onClick={() => toggleArea(areaId)}
                 className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
-                  selectedAreas.includes(area.id)
+                  selectedAreas.includes(areaId)
                     ? "border-primary bg-primary/5 text-foreground"
                     : "border-border text-muted-foreground hover:border-border/80"
                 }`}
               >
-                {lang === "es" ? area.labelEs : area.labelEn}
-                {selectedAreas.includes(area.id) && <Check className="h-3.5 w-3.5 inline ml-2 text-primary" />}
+                {p.areas[areaId]}
+                {selectedAreas.includes(areaId) && <Check className="h-3.5 w-3.5 inline ml-2 text-primary" />}
               </button>
             ))}
           </div>
@@ -222,19 +210,18 @@ const Pain = () => {
           transition={{ delay: 0.14 }}
           className="bg-card rounded-2xl p-5 border border-border/30"
         >
-          <label className="font-medium text-sm text-foreground mb-3 block">{noteLabel}</label>
+          <label className="font-medium text-sm text-foreground mb-3 block">{p.noteLabel}</label>
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder={notePh}
+            placeholder={p.notePlaceholder}
             className="resize-none border-0 bg-muted/50 focus-visible:ring-0"
           />
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}>
           <Button variant="hero" size="lg" className="w-full" onClick={handleSubmit}>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin hidden" />
-            {saveLabel}
+            {p.saveLabel}
           </Button>
         </motion.div>
       </div>

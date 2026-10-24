@@ -11,17 +11,12 @@ if (import.meta.env.DEV && !isSupabaseConfigured) {
   );
 }
 
-const isAutomated =
-  typeof navigator !== "undefined" &&
-  (navigator.webdriver ||
-    /HeadlessChrome|Playwright|puppeteer|Chrome-Lighthouse/i.test(navigator.userAgent || ""));
-
 const supabase: SupabaseClient = isSupabaseConfigured
   ? createClient(supabaseUrl!, supabaseAnonKey!, {
       auth: {
-        persistSession: !isAutomated,
-        autoRefreshToken: !isAutomated,
-        detectSessionInUrl: !isAutomated,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
       },
     })
   : createClient("https://placeholder.supabase.co", "placeholder-key", {

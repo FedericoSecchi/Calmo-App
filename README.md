@@ -1,199 +1,55 @@
-# Calmo - Desk Companion
+# Calmo
 
-A Progressive Web App (PWA) for healthy habits while working at your computer. Take care of your posture and well-being while working, without pain.
+Healthy habits for computer work — a small, quiet PWA. [calmo.fit](https://calmo.fit).
 
-## 🚀 Live Demo
+## What it is
 
-The app is deployed on GitHub Pages: [View Live](https://federicosecchi.github.io/calm-desk-companion/)
+- Focus timer with screen-break nudges.
+- Short mobility routines and guided breathing.
+- Pain log that stays on your device.
+- Water count and daily streaks.
+- English and Spanish throughout the app (dictionary-based i18n). No ads, no cookies.
 
-## 🛠️ Technologies
+## Stack
 
-This project is built with:
+Vite · React 18 + TypeScript · Tailwind · shadcn/ui · React Router · Supabase (auth + Postgres with RLS) · PWA · GitHub Pages.
 
-- **Vite** - Build tool and dev server
-- **React 18** - UI library
-- **TypeScript** - Type safety
-- **React Router** - Client-side routing
-- **shadcn/ui** - UI component library
-- **Tailwind CSS** - Styling
-- **Vite PWA Plugin** - Progressive Web App support
-- **Supabase** - Authentication and backend services
+## Running locally
 
-## 📦 Getting Started
+Requirements: Node ≥ 20.
 
-### Prerequisites
-
-- Node.js 20+ (recommended: use [nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
-- npm or bun
-- Supabase project (for authentication)
-
-### Environment Variables
-
-Create a `.env.local` file in the root directory with the following variables:
-
-```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-**How to get these values:**
-1. Go to [Supabase Dashboard](https://app.supabase.com)
-2. Select your project (or create a new one)
-3. Go to **Settings → API**
-4. Copy the following:
-   - **"Project URL"** → Use for `VITE_SUPABASE_URL`
-   - **"anon public" key** → Use for `VITE_SUPABASE_ANON_KEY`
-
-**Important:** Never commit `.env.local` to version control. It's already in `.gitignore`.
-
-### Supabase Dashboard Configuration
-
-Before using authentication, configure the following in your Supabase project:
-
-#### 1. Enable Email Authentication
-- Go to **Authentication → Providers**
-- Ensure **Email** provider is enabled
-- Configure email templates if needed
-
-**For Local Development (Optional):**
-- To disable email confirmation for faster testing:
-  - Go to **Authentication → Settings**
-  - Under **Email Auth**, toggle **"Enable email confirmations"** to OFF
-  - This allows users to sign up and use the app immediately without email verification
-  - **Note:** Keep this enabled for production for security
-
-#### 2. Enable Google OAuth (Optional)
-- Go to **Authentication → Providers**
-- Enable **Google** provider
-- Click **Configure** and add:
-  - **Client ID** (from Google Cloud Console)
-  - **Client Secret** (from Google Cloud Console)
-- **Important:** The redirect URL in Google Cloud Console must match:
-  - For local dev: `http://localhost:5173/auth/callback`
-  - For production: `https://federicosecchi.github.io/calm-desk-companion/auth/callback`
-
-#### 3. Configure Redirect URLs in Supabase
-- Go to **Authentication → URL Configuration**
-- Add to **Redirect URLs** (one per line):
-  ```
-  http://localhost:5173/auth/callback
-  https://federicosecchi.github.io/calm-desk-companion/auth/callback
-  ```
-- **Site URL** should be set to your production URL:
-  ```
-  https://federicosecchi.github.io/calm-desk-companion
-  ```
-
-#### 4. Set Up Profiles Table
-The app expects a `profiles` table with the following structure. Run this SQL in your Supabase SQL Editor:
-
-```sql
--- Create profiles table
-CREATE TABLE IF NOT EXISTS profiles (
-  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
-);
-
--- Enable Row Level Security
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-
--- Drop existing policies if they exist (for idempotency)
-DROP POLICY IF EXISTS "Users can read own profile" ON profiles;
-DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
-DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
-
--- Policy: Users can read their own profile
-CREATE POLICY "Users can read own profile"
-  ON profiles FOR SELECT
-  USING (auth.uid() = id);
-
--- Policy: Users can insert their own profile
-CREATE POLICY "Users can insert own profile"
-  ON profiles FOR INSERT
-  WITH CHECK (auth.uid() = id);
-
--- Policy: Users can update their own profile
-CREATE POLICY "Users can update own profile"
-  ON profiles FOR UPDATE
-  USING (auth.uid() = id);
-```
-
-**Important Notes:**
-- The `id` column references `auth.users(id)` - this is automatically set by Supabase
-- The app will automatically create a profile row when a user signs in for the first time
-- RLS policies ensure users can only access their own profile
-- The `ON DELETE CASCADE` ensures profiles are deleted when users are deleted
-
-### Installation
-
-```sh
-# Clone the repository
-git clone https://github.com/FedericoSecchi/calm-desk-companion.git
-
-# Navigate to the project directory
-cd calm-desk-companion
-
-# Install dependencies
-npm install
-
-# Create .env.local file with your Supabase credentials
-# (See Environment Variables section above)
-
-# Start the development server
+```bash
+npm ci
 npm run dev
+# http://localhost:5173
 ```
 
-The app will be available at `http://localhost:5173`
+The repository ships a committed `.env` with the public Supabase anon key. You can override it with a local `.env.local`.
 
-## 🏗️ Build
+## Scripts
 
-```sh
-# Build for production
-npm run build
+- `npm run dev` — Vite dev server.
+- `npm run build` — generates `dist/` with sitemap, robots and the build-id stamp.
+- `npm run prerender` — renders every public route into `dist/<path>/index.html`.
+- `npm run og` — regenerates the OG images in `dist/`.
+- `npm run verify:dist` — asserts the prerendered output has title, description, canonical, hreflang and `<h1>` per route.
+- `npm test` — unit tests (vitest).
+- `npm run lint` — ESLint.
+- `npm run e2e` — Playwright end-to-end (public + guest + language + waitlist + account round-trip + i18n regression).
+- `bash scripts/verify.sh` — full verification suite before pushing to `main`.
 
-# Preview production build locally
-npm run preview
+## Deploy
+
+Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds, prerenders every public route, generates OG images, injects a `build-id` meta into each HTML, and publishes to GitHub Pages at `calmo.fit`.
+
+A separate `keepalive.yml` cron hits `rpc/ping` every 3 days so the Supabase free project doesn't pause.
+
+## Verification
+
+After a push, check that the live site serves the new build:
+
+```bash
+curl -s https://calmo.fit/ | grep build-id
 ```
 
-## 📱 PWA Features
-
-- **Installable** - Can be installed on desktop and mobile devices
-- **Offline Support** - Service worker caches assets for offline use
-- **App-like Experience** - Standalone display mode
-
-## 🚢 Deployment
-
-This project is automatically deployed to GitHub Pages via GitHub Actions when changes are pushed to the `main` branch.
-
-### Manual Deployment
-
-1. Build the project: `npm run build`
-2. The `dist` folder contains the production-ready files
-3. GitHub Actions will automatically deploy on push to `main`
-
-### GitHub Pages Setup
-
-1. Go to repository Settings > Pages
-2. Source should be set to "GitHub Actions"
-3. The workflow will automatically deploy on each push to `main`
-
-## 📝 Development
-
-### Project Structure
-
-```
-calm-desk-companion/
-├── public/          # Static assets
-├── src/
-│   ├── components/  # React components
-│   ├── pages/      # Page components
-│   ├── layouts/    # Layout components
-│   ├── hooks/      # Custom React hooks
-│   └── lib/        # Utilities
-└── dist/           # Build output (generated)
-```
-
-## 📄 License
-
-This project is private and proprietary.
+Full documentation lives in `CLAUDE.md` and under `docs/`.

@@ -75,17 +75,53 @@ const Settings = () => {
   };
 
   const handleDeleteAccount = async () => {
+    // Hit the REST endpoint directly to sidestep the supabase-js lock that
+    // can block rpc() calls during logout-adjacent transitions. Read the
+    // bearer token straight from the storage key supabase-js writes.
     try {
       if (isSupabaseConfigured) {
-        await supabase.rpc("delete_my_account");
+        const url = import.meta.env.VITE_SUPABASE_URL as string;
+        const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+        let token: string | null = null;
+        for (let i = 0; i < window.localStorage.length; i += 1) {
+          const storageKey = window.localStorage.key(i);
+          if (storageKey && storageKey.startsWith("sb-") && storageKey.endsWith("-auth-token")) {
+            try {
+              const raw = window.localStorage.getItem(storageKey);
+              const parsed = raw ? JSON.parse(raw) : null;
+              token = (parsed && parsed.access_token) || null;
+            } catch {
+              /* ignore */
+            }
+            break;
+          }
+        }
+        if (token && url && key) {
+          await fetch(`${url}/rest/v1/rpc/delete_my_account`, {
+            method: "POST",
+            headers: {
+              apikey: key,
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+        }
       }
     } catch {
-      /* silent */
+      /* best-effort */
     }
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      /* silent */
+    // Clear Supabase local auth tokens directly to avoid the signOut lock.
+    if (typeof window !== "undefined") {
+      try {
+        for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+          const key = window.localStorage.key(i);
+          if (key && (key.startsWith("sb-") || key === "supabase.auth.token")) {
+            window.localStorage.removeItem(key);
+          }
+        }
+      } catch {
+        /* ignore */
+      }
     }
     clearLocalCalmoData();
     toast({ title: t.app.settings.deleteAccountDone });
@@ -200,7 +236,7 @@ const Settings = () => {
                 <AlertDialogDescription>{t.app.settings.deleteAccountConfirm}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>{lang === "es" ? "Cancelar" : "Cancel"}</AlertDialogCancel>
+                <AlertDialogCancel>{t.app.settings.cancel}</AlertDialogCancel>
                 <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={handleDeleteAccount}>
                   {t.app.settings.deleteAccount}
                 </AlertDialogAction>

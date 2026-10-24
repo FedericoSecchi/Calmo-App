@@ -8,9 +8,20 @@ import { useT } from "@/lib/i18n";
 import { useWaitlist } from "@/hooks/useWaitlist";
 import { track } from "@/lib/analytics";
 
+function resolveSource(fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const q = new URLSearchParams(window.location.search).get("source");
+    if (q === "e2e") return "e2e";
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
 export const PricingSection = () => {
   const { t } = useT();
-  const { status, error, submit } = useWaitlist(t.waitlist.sources.pricing);
+  const { status, error, submit } = useWaitlist(resolveSource(t.waitlist.sources.pricing));
   const [email, setEmail] = useState("");
 
   useEffect(() => {

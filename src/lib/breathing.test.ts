@@ -32,10 +32,10 @@ describe("breathingPatterns", () => {
     }
   });
 
-  it("all patterns have names and descriptions", () => {
+  it("all patterns have an id and a translation display id", () => {
     for (const pattern of breathingPatterns) {
-      expect(pattern.name).toBeTruthy();
-      expect(pattern.description).toBeTruthy();
+      expect(pattern.id).toBeTruthy();
+      expect(pattern.displayId).toMatch(/^b-/);
     }
   });
 

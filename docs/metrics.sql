@@ -24,13 +24,16 @@ select
 from step
 order by week desc;
 
--- Conversiones de waitlist por semana e idioma
+-- Conversiones de waitlist por semana e idioma.
+-- Excluye filas insertadas desde e2e (source = 'e2e') y emails e2e+*@calmo.fit.
 select
   date_trunc('week', created_at) as week,
   lang,
   count(*) as joined
 from public.waitlist
 where created_at >= now() - interval '12 weeks'
+  and source is distinct from 'e2e'
+  and email not like 'e2e+%@calmo.fit'
 group by 1, 2
 order by week desc, lang;
 

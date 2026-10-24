@@ -1,17 +1,13 @@
-/**
- * ScreenBreakBanner Component
- * 
- * Displays a 20-20-20 screen break prompt during WORK phase.
- * Shows a countdown and allows dismissal or snooze.
- */
-
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { X, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import { useFocusTimer } from "@/contexts/FocusTimerContext";
+import { useT } from "@/lib/i18n";
 
 export const ScreenBreakBanner = () => {
   const { screenBreak, dismissScreenBreak, snoozeScreenBreak, currentPhase, isRunning } = useFocusTimer();
+  const { t } = useT();
+  const s = t.app.screenBreak;
 
   const shouldShow = screenBreak.isOpen && currentPhase === "work";
 
@@ -30,50 +26,39 @@ export const ScreenBreakBanner = () => {
         >
           <div className="max-w-2xl mx-auto">
             <div className="bg-card border border-border/50 rounded-xl p-4 shadow-lg">
-              {/* Pre-alert message */}
-              <p className="text-xs text-muted-foreground mb-3 text-center">
-                Si te molesta o te duele, ignorálo y seguí normal
-              </p>
-              
-              {/* Main content */}
+              <p className="text-xs text-muted-foreground mb-3 text-center">{s.preAlert}</p>
+
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 flex-1">
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <Clock className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground mb-1">
-                      Regla 20-20-20: mirá 20s a 6 metros
-                    </p>
-                    <p 
-                      className="text-sm text-muted-foreground"
-                      aria-live="polite"
-                      aria-atomic="true"
-                    >
-                      {isRunning ? `${screenBreak.countdownSeconds}s` : "Pausado"}
+                    <p className="font-medium text-foreground mb-1">{s.message}</p>
+                    <p className="text-sm text-muted-foreground" aria-live="polite" aria-atomic="true">
+                      {isRunning ? `${screenBreak.countdownSeconds}s` : s.paused}
                     </p>
                   </div>
                 </div>
-                
-                {/* Actions */}
+
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={snoozeScreenBreak}
                     className="text-xs"
-                    aria-label="Posponer 5 minutos"
+                    aria-label={s.snoozeAria}
                   >
-                    Posponer 5 min
+                    {s.snooze}
                   </Button>
                   <Button
                     variant="default"
                     size="sm"
                     onClick={dismissScreenBreak}
                     className="text-xs"
-                    aria-label="Listo, completado"
+                    aria-label={s.doneAria}
                   >
-                    Listo
+                    {s.done}
                   </Button>
                 </div>
               </div>
@@ -84,4 +69,3 @@ export const ScreenBreakBanner = () => {
     </AnimatePresence>
   );
 };
-

@@ -65,5 +65,11 @@ export function useT() {
   return { t: DICTS[lang], lang };
 }
 
+export function format(template: string, params: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) =>
+    Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : `{${key}}`
+  );
+}
+
 export { LANGS, DEFAULT_LANG };
 export type { Lang };

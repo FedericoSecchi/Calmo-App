@@ -17,6 +17,7 @@ import { useBreakLogs } from "@/hooks/useBreakLogs";
 import { useToast } from "@/hooks/use-toast";
 import { useReminderSettings } from "@/hooks/useReminderSettings";
 import { useAuth } from "@/contexts/AuthContext";
+import { useT, format as fmt } from "@/lib/i18n";
 
 const TIMER_STORAGE_KEY = "calmo_reminder_timer_state";
 
@@ -25,9 +26,6 @@ export type PresetId = "light" | "standard" | "focus";
 
 export interface PresetConfig {
   id: PresetId;
-  name: string;
-  interval: string;
-  description: string;
   workMinutes: number;
   restMinutes: number;
 }
@@ -41,9 +39,9 @@ export interface ScreenBreakState {
 }
 
 export const presets: PresetConfig[] = [
-  { id: "light", name: "Ritmo Suave", interval: "60 min", description: "60 min trabajo · 10 min descanso", workMinutes: 60, restMinutes: 10 },
-  { id: "standard", name: "Ritmo Balanceado", interval: "45 min", description: "45 min trabajo · 5 min descanso", workMinutes: 45, restMinutes: 5 },
-  { id: "focus", name: "Ritmo Profundo", interval: "90 min", description: "90 min trabajo · 10 min descanso", workMinutes: 90, restMinutes: 10 },
+  { id: "light", workMinutes: 60, restMinutes: 10 },
+  { id: "standard", workMinutes: 45, restMinutes: 5 },
+  { id: "focus", workMinutes: 90, restMinutes: 10 },
 ];
 
 interface TimerState {
@@ -109,6 +107,7 @@ interface FocusTimerProviderProps {
 export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
   const { isGuest } = useAuth();
   const { toast } = useToast();
+  const { t } = useT();
   const { settings, updateSettings } = useReminderSettings();
   const { logBreak } = useBreakLogs();
   
@@ -256,11 +255,12 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
   // Helper function to trigger notification and sound
   const triggerNotificationAndSound = useCallback((title: string, body: string, isWorkToRest: boolean) => {
     // Trigger notification
-    if (Notification.permission === "granted") {
-      new Notification(title, {
-        body,
-        icon: "/icon-192.png",
-      });
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      try {
+        new Notification(title, { body, icon: "/icon-192.png" });
+      } catch {
+        /* ignore */
+      }
     }
     
     // Play sound if enabled
@@ -410,11 +410,18 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
           
           // Show subtle toast for final seconds (1-3)
           if (currentSecond <= 3) {
+            const title =
+              currentSecond === 1
+                ? t.app.timer.toasts.countdownSecond
+                : fmt(t.app.timer.toasts.countdownSecondsPlural, { n: currentSecond });
             toast({
-              title: `${currentSecond} segundo${currentSecond > 1 ? 's' : ''}`,
-              description: currentSecond === 1 
-                ? (currentPhase === "work" ? "¡Momento de descansar!" : "¡Vuelve al trabajo!")
-                : undefined,
+              title,
+              description:
+                currentSecond === 1
+                  ? currentPhase === "work"
+                    ? t.app.timer.toasts.countdownBackToRest
+                    : t.app.timer.toasts.countdownBackToWork
+                  : undefined,
               duration: 1000,
             });
           }
@@ -460,14 +467,14 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
         
         if (isFreshTransition) {
           triggerNotificationAndSound(
-            "Momento de pausar",
-            "Levántate y muévete. Tómate un descanso.",
+            t.app.timer.notifications.timeToBreakTitle,
+            t.app.timer.notifications.timeToBreakBody,
             true
           );
 
           toast({
-            title: "¡Hora de descansar!",
-            description: `Tómate ${config.restMinutes} minutos de pausa.`,
+            title: t.app.timer.toasts.restStartedTitle,
+            description: fmt(t.app.timer.toasts.restStartedDesc, { min: config.restMinutes }),
           });
         }
         
@@ -491,14 +498,14 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
           setShowEndOfFocusDialog(true);
           
           triggerNotificationAndSound(
-            "Pausa completada",
-            "¡Bien hecho! Vuelve al trabajo.",
+            t.app.timer.notifications.breakCompletedTitle,
+            t.app.timer.notifications.breakCompletedBody,
             false
           );
 
           toast({
-            title: "Pausa completada",
-            description: "¡Bien hecho! Vuelve al trabajo.",
+            title: t.app.timer.toasts.breakCompletedTitle,
+            description: t.app.timer.toasts.breakCompletedDesc,
           });
         }
         

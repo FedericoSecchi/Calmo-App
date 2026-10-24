@@ -48,7 +48,10 @@ scripts/
 supabase/migrations/    — 002/003/004/005 (001 obsoleto)
 tests/
   unit/                 — vitest (timer, stats, breathing)
-  e2e/                  — Playwright (invitado, cuenta, idioma, waitlist)
+  e2e/                  — Playwright (invitado, cuenta round-trip, idioma, waitlist, i18n-app)
+    i18n-app.spec.ts    — renderiza cada pantalla en inglés y falla si encuentra palabras típicas en español
+    account.spec.ts     — round-trip de cuenta usando contextos de navegador separados
+    helpers.ts          — helpers (deleteAccountByCredentials, e2eEmail)
 scripts/verify.sh       — ciclo de verificación local
 ```
 
@@ -56,10 +59,12 @@ scripts/verify.sh       — ciclo de verificación local
 
 - `main` es producción. Cada push a `main` despliega. Solo pushear con `scripts/verify.sh` en PASS local.
 - Idiomas: **inglés en la raíz** con slugs actuales; **español bajo `/es/`** con slugs en español. hreflang en/es + x-default → inglés.
-- **Privacidad mínima**: sin cookies de terceros, sin GA, sin banner. Fuentes locales. Analítica propia anónima (`events`) con `session_id` en memoria.
-- Auth: email + contraseña nomás. Sin Google OAuth. Confirmación por email desactivada en Supabase; sin "forgot password" (no hay SMTP).
+- **i18n completa en la app**: todo texto visible (Dashboard, Reminders, Exercises, Pain, Settings, Onboarding, Auth, dialogs, toasts, errores) sale del diccionario tipado en `src/lib/i18n/{en,es}.ts`. En las páginas públicas el idioma lo define la URL; en la app, la preferencia guardada → navegador → inglés.
+- **Privacidad mínima**: sin cookies de terceros, sin GA, sin banner. Fuentes locales. Analítica propia anónima (`events`) con `session_id` en memoria. La analítica se omite en navegadores automatizados (Playwright, Lighthouse) para no inflar métricas.
+- Auth: email + contraseña nomás. Sin Google OAuth. Confirmación por email desactivada en Supabase; sin "forgot password" (no hay SMTP). `persistSession: true` siempre (sin workaround específico para automatización).
+- Borrado de cuenta: `delete_my_account` se llama vía `fetch` directo al endpoint REST para evitar el lock interno de `supabase-js` durante la transición de logout; después se limpian los `sb-*` tokens de `localStorage`.
 - **Dolor solo en el dispositivo** (localStorage), también para usuarios logueados. La UI lo dice en una línea.
-- **Plan Pro en lista de espera** (USD 4,99/mes, "en desarrollo"), inserta en `waitlist` (unique email → duplicado es éxito).
+- **Plan Pro en lista de espera** (USD 4,99/mes, "en desarrollo"), inserta en `waitlist` (unique email → duplicado es éxito). Tests envían `source="e2e"` vía `?source=e2e` para filtrar métricas.
 - No agregar features ni abstracciones no pedidas. No logs de debug en prod.
 
 ## Datos / Supabase

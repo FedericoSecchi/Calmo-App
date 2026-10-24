@@ -48,9 +48,7 @@ export const Footer = ({ variant = "full" }: FooterProps) => {
           </div>
 
           <div>
-            <h4 className="font-heading text-sm uppercase tracking-wider text-foreground mb-4">
-              {lang === "es" ? "Producto" : "Product"}
-            </h4>
+            <h4 className="font-heading text-sm uppercase tracking-wider text-foreground mb-4">{t.footer.product}</h4>
             <ul className="space-y-3">
               <li>
                 <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -71,7 +69,7 @@ export const Footer = ({ variant = "full" }: FooterProps) => {
           </div>
 
           <div>
-            <h4 className="font-heading text-sm uppercase tracking-wider text-foreground mb-4">Legal</h4>
+            <h4 className="font-heading text-sm uppercase tracking-wider text-foreground mb-4">{t.footer.legal}</h4>
             <ul className="space-y-3">
               <li>
                 <Link to={privacy} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
