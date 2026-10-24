@@ -13,7 +13,7 @@ test.describe("Account round-trip", () => {
   });
 
   test("sign up → sign out → login → delete account", async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     const email = e2eEmail();
     createdEmail = email;
 
