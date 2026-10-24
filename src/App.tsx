@@ -41,7 +41,11 @@ const RedirectHandler = () => {
   const navigate = useNavigate();
   useEffect(() => {
     const redirect = searchParams.get("redirect");
-    if (redirect) navigate(redirect, { replace: true });
+    if (!redirect) return;
+    const rest = new URLSearchParams(searchParams);
+    rest.delete("redirect");
+    const extra = rest.toString();
+    navigate(extra ? `${redirect}?${extra}` : redirect, { replace: true });
   }, [searchParams, navigate]);
   return null;
 };
