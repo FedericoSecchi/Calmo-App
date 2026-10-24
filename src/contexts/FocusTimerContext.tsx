@@ -266,7 +266,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     // Play sound if enabled
     if (soundEnabled) {
       try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
         
@@ -298,7 +298,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     if (!soundEnabled) return;
     
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
@@ -326,7 +326,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
   const playBeep = useCallback((frequency: number = 800, duration: number = 0.1) => {
     if (!soundEnabled) return;
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       oscillator.connect(gainNode);

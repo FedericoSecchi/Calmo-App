@@ -1,116 +1,82 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { useAuth } from "@/contexts/AuthContext";
+import { useCallback, useEffect, useState } from "react";
 
-/**
- * PainRecord Interface
- * 
- * Current model: Single area per record
- * Future model: Multiple areas per record (see HABITS_MODEL.md)
- * 
- * TODO: When backend supports multiple areas:
- * - Change `area: string` to `areas: string[]`
- * - Update createPainRecord to handle array
- * - Update Pain.tsx UI to allow multiple area selection
- */
 export interface PainRecord {
   id: string;
-  user_id: string;
-  area: string; // TODO: Change to `areas: string[]` when backend supports it
-  intensity: number; // 1-10 (general intensity or average if multiple areas)
-  notes: string | null; // Free text for specifying other discomforts
+  area: string;
+  intensity: number;
+  notes: string | null;
   created_at: string;
 }
 
 export interface CreatePainRecord {
-  area: string; // TODO: Change to `areas: string[]` when backend supports it
+  area: string;
   intensity: number;
-  notes?: string; // Free text for specifying other discomforts
+  notes?: string;
 }
 
-// Fetch pain records for authenticated user
-const fetchPainRecords = async (userId: string, days: number = 30): Promise<PainRecord[]> => {
-  if (!isSupabaseConfigured) {
+const STORAGE_KEY = "calmo_pain_log";
+
+function read(): PainRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as PainRecord[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
     return [];
   }
+}
 
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-
-  const { data, error } = await supabase
-    .from("pain_records")
-    .select("*")
-    .eq("user_id", userId)
-    .gte("created_at", startDate.toISOString())
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    if (import.meta.env.DEV) {
-      console.error("Error fetching pain records:", error);
-    }
-    throw error;
+function write(records: PainRecord[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records.slice(-500)));
+  } catch {
+    /* ignore */
   }
-
-  return data || [];
-};
-
-// Create a new pain record
-const createPainRecord = async (record: CreatePainRecord): Promise<PainRecord> => {
-  if (!isSupabaseConfigured) {
-    throw new Error("Supabase is not configured");
-  }
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error("User not authenticated");
-  }
-
-  const { data, error } = await supabase
-    .from("pain_records")
-    .insert({
-      user_id: user.id,
-      area: record.area,
-      intensity: record.intensity,
-      notes: record.notes || null,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    if (import.meta.env.DEV) {
-      console.error("Error creating pain record:", error);
-    }
-    throw error;
-  }
-
-  return data;
-};
+}
 
 export const usePainRecords = (days: number = 30) => {
-  const { user, isGuest } = useAuth();
-  const queryClient = useQueryClient();
+  const [records, setRecords] = useState<PainRecord[]>(() => read());
 
-  const query = useQuery({
-    queryKey: ["pain-records", user?.id, days],
-    queryFn: () => user && !isGuest ? fetchPainRecords(user.id, days) : Promise.resolve([]),
-    enabled: !!user && !isGuest && isSupabaseConfigured,
-  });
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) setRecords(read());
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
 
-  const mutation = useMutation({
-    mutationFn: createPainRecord,
-    onSuccess: () => {
-      // Invalidate and refetch pain records
-      queryClient.invalidateQueries({ queryKey: ["pain-records"] });
-    },
-  });
+  const filtered = (() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    return records
+      .filter((r) => new Date(r.created_at).getTime() >= cutoff.getTime())
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  })();
+
+  const createRecord = useCallback((input: CreatePainRecord) => {
+    const next: PainRecord = {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+      area: input.area,
+      intensity: input.intensity,
+      notes: input.notes ?? null,
+      created_at: new Date().toISOString(),
+    };
+    setRecords((prev) => {
+      const updated = [...prev, next];
+      write(updated);
+      return updated;
+    });
+  }, []);
 
   return {
-    records: query.data || [],
-    isLoading: query.isLoading,
-    error: query.error,
-    createRecord: mutation.mutate,
-    isCreating: mutation.isPending,
-    createError: mutation.error,
+    records: filtered,
+    isLoading: false,
+    error: null as unknown,
+    createRecord,
+    isCreating: false,
+    createError: null as unknown,
   };
 };
-

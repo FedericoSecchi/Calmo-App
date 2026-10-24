@@ -1,0 +1,24 @@
+name: Supabase keepalive
+
+on:
+  schedule:
+    - cron: '0 7 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call rpc/ping
+        env:
+          SUPABASE_URL: https://wtquhlfodfqjcggaqxwk.supabase.co
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0cXVobGZvZGZxamNnZ2FxeHdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzMDMwODEsImV4cCI6MjA4MTg3OTA4MX0.JwgGiN2_02cBqFFTA2fF_yjKSiaDBBuzBOHxYuU7vZI
+        run: |
+          set -e
+          response=$(curl -s -o /tmp/body -w "%{http_code}" \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/ping" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json")
+          echo "HTTP $response"
+          cat /tmp/body
+          test "$response" = "200" || (echo "ping failed" && exit 1)

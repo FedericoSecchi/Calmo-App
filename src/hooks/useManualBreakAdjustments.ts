@@ -1,95 +1,90 @@
-/**
- * useManualBreakAdjustments Hook
- * 
- * Manages manual break adjustments (+ / -) separate from timer-completed breaks.
- * These adjustments allow users to correct their daily break count.
- * 
- * Storage:
- * - Guest mode: localStorage (calmo_manual_break_adjustments)
- * - Auth mode: TODO - future backend table for manual adjustments
- * 
- * Model:
- * - Each day has a single adjustment value (can be positive or negative)
- * - Adjustment is added to timer breaks to get total breaks for the day
- * - Adjustments reset daily (but historical values are preserved)
- */
-
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { getTodayDateString } from "@/lib/utils";
 
 const STORAGE_KEY = "calmo_manual_break_adjustments";
 
-interface ManualAdjustment {
-  date: string; // ISO date string (YYYY-MM-DD)
-  adjustment: number; // Can be positive or negative
-}
-
-// Get adjustments from localStorage (guest mode)
-const getGuestAdjustments = (): Record<string, number> => {
+function readGuest(): Record<string, number> {
+  if (typeof window === "undefined") return {};
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return {};
-    return JSON.parse(stored);
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return stored ? (JSON.parse(stored) as Record<string, number>) : {};
   } catch {
     return {};
   }
-};
+}
 
-// Save adjustments to localStorage (guest mode)
-const saveGuestAdjustments = (adjustments: Record<string, number>) => {
+function writeGuest(data: Record<string, number>) {
+  if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(adjustments));
-  } catch (e) {
-    if (import.meta.env.DEV) {
-      console.error("Error saving manual break adjustments:", e);
-    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    /* ignore */
   }
-};
+}
 
 export const useManualBreakAdjustments = () => {
-  const { isGuest } = useAuth();
-  const [adjustments, setAdjustments] = useState<Record<string, number>>(() => {
-    if (isGuest) {
-      return getGuestAdjustments();
-    }
-    // TODO: For auth mode, fetch from backend
-    return {};
-  });
+  const { user, isGuest } = useAuth();
+  const [adjustments, setAdjustments] = useState<Record<string, number>>(() => readGuest());
 
-  // Sync to localStorage when adjustments change (guest mode)
+  useEffect(() => {
+    if (!user || isGuest || !isSupabaseConfigured) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("manual_break_adjustments")
+        .select("date,adjustment")
+        .eq("user_id", user.id);
+      if (!cancelled && !error && data) {
+        const map: Record<string, number> = {};
+        data.forEach((row: { date: string; adjustment: number }) => {
+          map[row.date] = row.adjustment;
+        });
+        setAdjustments(map);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isGuest]);
+
   useEffect(() => {
     if (isGuest) {
-      saveGuestAdjustments(adjustments);
+      writeGuest(adjustments);
     }
   }, [adjustments, isGuest]);
 
-  // Get today's adjustment
-  const getTodayAdjustment = (): number => {
+  const getTodayAdjustment = () => {
     const today = getTodayDateString();
     return adjustments[today] || 0;
   };
 
-  // Adjust today's break count
+  const persistToServer = async (date: string, value: number) => {
+    if (!user || isGuest || !isSupabaseConfigured) return;
+    await supabase
+      .from("manual_break_adjustments")
+      .upsert({ user_id: user.id, date, adjustment: value }, { onConflict: "user_id,date" });
+  };
+
   const adjustToday = (delta: number) => {
     const today = getTodayDateString();
     setAdjustments((prev) => {
       const current = prev[today] || 0;
-      const newValue = current + delta;
-      // Don't allow negative total (but allow negative adjustment to correct)
-      return {
-        ...prev,
-        [today]: newValue,
-      };
+      const nextValue = current + delta;
+      const next = { ...prev, [today]: nextValue };
+      void persistToServer(today, nextValue);
+      return next;
     });
   };
 
-  // Reset today's adjustment (manual reset)
   const resetToday = () => {
     const today = getTodayDateString();
     setAdjustments((prev) => {
-      const { [today]: _, ...rest } = prev;
-      return rest;
+      const copy = { ...prev };
+      delete copy[today];
+      void persistToServer(today, 0);
+      return copy;
     });
   };
 
@@ -99,4 +94,3 @@ export const useManualBreakAdjustments = () => {
     resetToday,
   };
 };
-

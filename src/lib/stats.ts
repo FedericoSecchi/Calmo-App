@@ -16,7 +16,7 @@ export interface ActivityLog {
  * - A day counts toward the streak if the user has at least 1 activity:
  *   - Completed break (from break_logs, including reminder-triggered breaks)
  *   - Logged water glass (from water_logs)
- *   - Logged pain record (from pain_records)
+ *   - Logged pain record (local only; not persisted on the server)
  * 
  * Important: A completed REST phase from the Reminders timer logs a break to break_logs
  * with type="reminder", which counts as a valid habit for streak calculation.
@@ -46,7 +46,7 @@ export function calculateStreak(
   // Calculate streak from today backwards
   const today = getTodayDateString();
   let streak = 0;
-  let currentDate = new Date(today);
+  const currentDate = new Date(today);
 
   for (const dateStr of sortedDates) {
     const logDate = formatDateToYYYYMMDD(dateStr);

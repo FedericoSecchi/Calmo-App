@@ -58,7 +58,7 @@ export function usePWA() {
   useEffect(() => {
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true ||
       document.referrer.includes("android-app://");
     setIsStandalone(standalone);
   }, []);
@@ -129,7 +129,9 @@ export function usePWA() {
     setInstallDismissed(true);
     try {
       localStorage.setItem(STORAGE_INSTALL_DISMISSED, "1");
-    } catch {}
+    } catch {
+      /* ignore storage errors */
+    }
   }, []);
 
   const markUserInteracted = useCallback(() => {

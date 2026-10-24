@@ -31,17 +31,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Playwright (chromium)
+        run: npx playwright install chromium --with-deps
+
       - name: Build
-        run: npm run build
         env:
           NODE_ENV: production
+          BUILD_ID: ${{ github.sha }}
+        run: npm run build
 
-      - name: Verify sitemap and robots in dist
-        run: |
-          test -f dist/sitemap.xml || (echo "Missing dist/sitemap.xml" && exit 1)
-          test -f dist/robots.txt || (echo "Missing dist/robots.txt" && exit 1)
-          grep -q "https://calmo.fit/sitemap.xml" dist/robots.txt || (echo "robots.txt missing sitemap reference" && exit 1)
-          echo "sitemap.xml and robots.txt OK"
+      - name: Prerender public routes
+        env:
+          BUILD_ID: ${{ github.sha }}
+        run: node scripts/prerender.mjs
+
+      - name: Generate OG images
+        run: node scripts/generate-og-images.mjs
+
+      - name: Verify artifacts
+        run: node scripts/verify-dist.mjs
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -61,4 +69,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-

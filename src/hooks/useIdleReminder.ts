@@ -31,7 +31,9 @@ export function useIdleReminder(onRemind: () => void) {
         reminderShownAtRef.current = now;
         try {
           localStorage.setItem(STORAGE_LAST_IDLE_REMINDER, String(now));
-        } catch {}
+        } catch {
+          /* ignore storage errors */
+        }
         setIdleReminderShown(true);
         onRemindRef.current();
       }

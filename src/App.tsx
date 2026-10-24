@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate, useSearchParams, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { FocusTimerProvider } from "./contexts/FocusTimerContext";
@@ -13,108 +13,76 @@ import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import AppLayout from "./layouts/AppLayout";
 import NotFound from "./pages/NotFound";
+import { HOME_PATHS, SEO_PATHS, LEGAL_PATHS } from "@/lib/i18n/types";
+import { SEO_META } from "@/lib/i18n/routes";
+import { usePageSEO } from "@/hooks/usePageSEO";
+import { useT } from "@/lib/i18n";
+import { trackPageView } from "@/lib/analytics";
 
-// Lazy-loaded app and SEO cluster pages for better initial bundle size
 const Dashboard = lazy(() => import("./pages/app/Dashboard"));
 const Reminders = lazy(() => import("./pages/app/Reminders"));
 const Exercises = lazy(() => import("./pages/app/Exercises"));
 const Pain = lazy(() => import("./pages/app/Pain"));
 const Settings = lazy(() => import("./pages/app/Settings"));
-const PortfolioPage = lazy(() => import("./pages/portfolio/PortfolioPage"));
-const CaseStudiesPage = lazy(() => import("./pages/case-studies/CaseStudiesPage"));
-const ProgrammaticSeoPage = lazy(() => import("./pages/programmatic-seo/ProgrammaticSeoPage"));
-const ImageSeoPage = lazy(() => import("./pages/image-seo/ImageSeoPage"));
-const TwentyTwentyRulePage = lazy(() => import("./pages/seo/TwentyTwentyRulePage"));
-const DeskStretchPage = lazy(() => import("./pages/seo/DeskStretchPage"));
-const EyeStrainPage = lazy(() => import("./pages/seo/EyeStrainPage"));
-const ComputerBreaksPage = lazy(() => import("./pages/seo/ComputerBreaksPage"));
-const NeckPainComputerPage = lazy(() => import("./pages/seo/NeckPainComputerPage"));
-const BackPainOfficePage = lazy(() => import("./pages/seo/BackPainOfficePage"));
-const PomodoroBreaksPage = lazy(() => import("./pages/seo/PomodoroBreaksPage"));
-const FocusCyclesPage = lazy(() => import("./pages/seo/FocusCyclesPage"));
+const SeoPage = lazy(() => import("./pages/seo/SeoPage"));
+const Privacy = lazy(() => import("./pages/legal/Privacy"));
+const Terms = lazy(() => import("./pages/legal/Terms"));
 
 const queryClient = new QueryClient();
 
 const PageFallback = () => (
   <div className="flex min-h-[50vh] items-center justify-center">
-    <div className="text-muted-foreground">Cargando...</div>
+    <div className="text-muted-foreground">Loading…</div>
   </div>
 );
 
-// Component to handle redirect from 404.html
 const RedirectHandler = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  
   useEffect(() => {
     const redirect = searchParams.get("redirect");
-    if (redirect) {
-      // Remove the redirect parameter and navigate to the route
-      navigate(redirect, { replace: true });
-    }
+    if (redirect) navigate(redirect, { replace: true });
   }, [searchParams, navigate]);
-  
   return null;
 };
 
-// Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
   const { user, loading, isGuest } = useAuth();
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-muted-foreground">Cargando...</div>
+        <div className="text-muted-foreground">Loading…</div>
       </div>
     );
   }
-
-  // Allow access if user is authenticated OR is a guest
   if (!user && !isGuest) {
     return <Navigate to="/auth" replace />;
   }
-
   return children;
 };
 
-// OAuth Callback Handler
-const AuthCallback = () => {
-  const { loading, user, session } = useAuth();
-  const navigate = useNavigate();
-
+const HomePage = ({ lang }: { lang: "en" | "es" }) => {
+  const { t } = useT();
+  const path = HOME_PATHS[lang];
+  const altPath = HOME_PATHS[lang === "en" ? "es" : "en"];
+  usePageSEO({ title: t.meta.homeTitle, description: t.meta.homeDescription, path, altPath, lang });
   useEffect(() => {
-    // Wait for auth to finish loading
-    if (loading) return;
-
-    // If we have a user/session, redirect to app
-    if (user || session) {
-      navigate("/app", { replace: true });
-      return;
-    }
-
-    // If no user after loading, there might be an error or the callback failed
-    // Wait a bit more for Supabase to process the callback, then redirect to auth
-    const timeout = setTimeout(() => {
-      if (!user && !session) {
-        // Redirect to auth page if callback didn't result in a session
-        navigate("/auth", { replace: true });
-      }
-    }, 2000);
-
-    return () => clearTimeout(timeout);
-  }, [loading, user, session, navigate]);
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <div className="text-muted-foreground mb-2">Completando inicio de sesión...</div>
-        {loading && (
-          <div className="text-sm text-muted-foreground">Por favor espera...</div>
-        )}
-      </div>
-    </div>
-  );
+    trackPageView();
+  }, []);
+  return <Index />;
 };
+
+const TrailingSlash = () => {
+  const location = useLocation();
+  const path = location.pathname;
+  const needsSlash = path !== "/" && !path.endsWith("/") && !path.startsWith("/app") && !path.startsWith("/auth") && !path.startsWith("/onboarding");
+  if (needsSlash) {
+    return <Navigate to={`${path}/${location.search}`} replace />;
+  }
+  return null;
+};
+
+const SEO_KEYS = Object.keys(SEO_PATHS) as Array<keyof typeof SEO_PATHS>;
 
 const App = () => (
   <ErrorBoundary>
@@ -124,44 +92,64 @@ const App = () => (
           <Toaster />
           <Sonner />
           <PWAProvider>
-          <BrowserRouter>
-            <RedirectHandler />
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/portfolio" element={<Suspense fallback={<PageFallback />}><PortfolioPage /></Suspense>} />
-              <Route path="/case-studies" element={<Suspense fallback={<PageFallback />}><CaseStudiesPage /></Suspense>} />
-              <Route path="/programmatic-seo" element={<Suspense fallback={<PageFallback />}><ProgrammaticSeoPage /></Suspense>} />
-              <Route path="/image-seo" element={<Suspense fallback={<PageFallback />}><ImageSeoPage /></Suspense>} />
-              <Route path="/20-20-20-rule" element={<Suspense fallback={<PageFallback />}><TwentyTwentyRulePage /></Suspense>} />
-              <Route path="/desk-stretch" element={<Suspense fallback={<PageFallback />}><DeskStretchPage /></Suspense>} />
-              <Route path="/eye-strain" element={<Suspense fallback={<PageFallback />}><EyeStrainPage /></Suspense>} />
-              <Route path="/computer-breaks" element={<Suspense fallback={<PageFallback />}><ComputerBreaksPage /></Suspense>} />
-              <Route path="/neck-pain-computer" element={<Suspense fallback={<PageFallback />}><NeckPainComputerPage /></Suspense>} />
-              <Route path="/back-pain-office" element={<Suspense fallback={<PageFallback />}><BackPainOfficePage /></Suspense>} />
-              <Route path="/pomodoro-breaks" element={<Suspense fallback={<PageFallback />}><PomodoroBreaksPage /></Suspense>} />
-              <Route path="/focus-cycles" element={<Suspense fallback={<PageFallback />}><FocusCyclesPage /></Suspense>} />
-              <Route
-                path="/app"
-                element={
-                  <ProtectedRoute>
-                    <FocusTimerProvider>
-                      <AppLayout />
-                    </FocusTimerProvider>
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
-                <Route path="reminders" element={<Suspense fallback={<PageFallback />}><Reminders /></Suspense>} />
-                <Route path="exercises" element={<Suspense fallback={<PageFallback />}><Exercises /></Suspense>} />
-                <Route path="pain" element={<Suspense fallback={<PageFallback />}><Pain /></Suspense>} />
-                <Route path="settings" element={<Suspense fallback={<PageFallback />}><Settings /></Suspense>} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+            <BrowserRouter>
+              <RedirectHandler />
+              <TrailingSlash />
+              <Routes>
+                <Route path="/" element={<HomePage lang="en" />} />
+                <Route path="/es" element={<Navigate to="/es/" replace />} />
+                <Route path="/es/" element={<HomePage lang="es" />} />
+
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/onboarding" element={<Onboarding />} />
+
+                {SEO_KEYS.map((key) => (
+                  <Route
+                    key={`${key}-en`}
+                    path={SEO_PATHS[key].en}
+                    element={
+                      <Suspense fallback={<PageFallback />}>
+                        <SeoPage pageKey={key} lang="en" title={SEO_META[key].en.title} description={SEO_META[key].en.description} />
+                      </Suspense>
+                    }
+                  />
+                ))}
+                {SEO_KEYS.map((key) => (
+                  <Route
+                    key={`${key}-es`}
+                    path={SEO_PATHS[key].es}
+                    element={
+                      <Suspense fallback={<PageFallback />}>
+                        <SeoPage pageKey={key} lang="es" title={SEO_META[key].es.title} description={SEO_META[key].es.description} />
+                      </Suspense>
+                    }
+                  />
+                ))}
+
+                <Route path={LEGAL_PATHS.privacy.en} element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
+                <Route path={LEGAL_PATHS.privacy.es} element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
+                <Route path={LEGAL_PATHS.terms.en} element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
+                <Route path={LEGAL_PATHS.terms.es} element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
+
+                <Route
+                  path="/app"
+                  element={
+                    <ProtectedRoute>
+                      <FocusTimerProvider>
+                        <AppLayout />
+                      </FocusTimerProvider>
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
+                  <Route path="reminders" element={<Suspense fallback={<PageFallback />}><Reminders /></Suspense>} />
+                  <Route path="exercises" element={<Suspense fallback={<PageFallback />}><Exercises /></Suspense>} />
+                  <Route path="pain" element={<Suspense fallback={<PageFallback />}><Pain /></Suspense>} />
+                  <Route path="settings" element={<Suspense fallback={<PageFallback />}><Settings /></Suspense>} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
           </PWAProvider>
         </AuthProvider>
       </TooltipProvider>

@@ -2,15 +2,19 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { User, Session, AuthError } from "@supabase/supabase-js";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 
+interface AuthResult {
+  data: { user: User | null; session: Session | null } | null;
+  error: AuthError | null;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
   isGuest: boolean;
-  signIn: (email: string, password: string) => Promise<{ data: { user: User | null; session: Session | null } | null; error: AuthError | null }>;
-  signUp: (email: string, password: string) => Promise<{ data: { user: User | null; session: Session | null } | null; error: AuthError | null }>;
+  signIn: (email: string, password: string) => Promise<AuthResult>;
+  signUp: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
-  signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signInAsGuest: () => void;
 }
 
@@ -24,141 +28,114 @@ export const useAuth = () => {
   return context;
 };
 
+const GUEST_FLAG_KEY = "calmo_guest_mode";
+
+function readGuestFlag(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(GUEST_FLAG_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeGuestFlag(enabled: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    if (enabled) window.localStorage.setItem(GUEST_FLAG_KEY, "1");
+    else window.localStorage.removeItem(GUEST_FLAG_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+const guestUserSingleton: User = {
+  id: "guest",
+  email: "guest@demo.local",
+  aud: "authenticated",
+  role: "authenticated",
+  created_at: new Date().toISOString(),
+  app_metadata: {},
+  user_metadata: {},
+};
+
 interface AuthProviderProps {
   children: ReactNode;
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
+  const initialGuest = readGuestFlag();
+  const [user, setUser] = useState<User | null>(initialGuest ? guestUserSingleton : null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isGuest, setIsGuest] = useState(false);
+  const [isGuest, setIsGuest] = useState(initialGuest);
 
-  // Define ensureProfile before useEffect to avoid reference issues
-  // This function safely creates a profile row when a user signs in for the first time
   const ensureProfile = async (userId: string) => {
     if (!isSupabaseConfigured) return;
-    
     try {
-      // Check if profile exists
-      const { data: existingProfile, error: selectError } = await supabase
+      const { data: existing, error: selectError } = await supabase
         .from("profiles")
         .select("id")
         .eq("id", userId)
         .single();
-
-      // If selectError is not a "not found" error, log it
-      if (selectError && selectError.code !== "PGRST116") {
-        // PGRST116 = no rows returned, which is expected if profile doesn't exist
-        if (import.meta.env.DEV) {
-          console.warn("Error checking profile:", selectError);
-        }
+      if (selectError && selectError.code !== "PGRST116") return;
+      if (!existing) {
+        await supabase.from("profiles").insert({ id: userId });
       }
-
-      // Create profile if it doesn't exist
-      if (!existingProfile) {
-        const { error: insertError } = await supabase.from("profiles").insert({
-          id: userId,
-          // Add any default profile fields here if needed
-        });
-
-        if (insertError) {
-          // 23505 is unique violation (race condition - another request created it)
-          // This is fine and can be ignored
-          if (insertError.code !== "23505") {
-            // Other errors should be logged
-            if (import.meta.env.DEV) {
-              console.error("Error creating profile:", insertError);
-            }
-          } else if (import.meta.env.DEV) {
-            // Log race condition in dev for debugging
-            console.debug("Profile already exists (race condition)");
-          }
-        } else if (import.meta.env.DEV) {
-          console.debug("✓ Profile created successfully");
-        }
-      }
-    } catch (error) {
-      // Catch any unexpected errors
-      if (import.meta.env.DEV) {
-        console.error("Unexpected error in ensureProfile:", error);
-      }
+    } catch {
+      /* silent */
     }
   };
 
   useEffect(() => {
-    // If Supabase is not configured, skip auth initialization completely
     if (!isSupabaseConfigured) {
       setLoading(false);
       return;
     }
 
-    // Safely get initial session with error handling
     let subscription: { unsubscribe: () => void } | null = null;
 
-    try {
-      // Get initial session
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          // Real session found – override any guest state
-          setSession(session);
-          setUser(session.user);
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: current } }) => {
+        if (current) {
+          writeGuestFlag(false);
+          setSession(current);
+          setUser(current.user);
           setIsGuest(false);
         } else {
-          // No real session – preserve guest mode if the user just signed in as guest
-          // (race condition: getSession resolves after signInAsGuest was called)
           setSession(null);
           setUser((prev) => (prev?.id === "guest" ? prev : null));
-          // Do NOT call setIsGuest(false) here – guest state is managed by signInAsGuest
         }
         setLoading(false);
-      }).catch((error) => {
-        // Only log errors in development
-        if (import.meta.env.DEV) {
-          console.error("Error getting session:", error);
-        }
-        setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
 
-      // Listen for auth changes - wrap in try-catch in case it throws
-      try {
-        const {
-          data: { subscription: sub },
-        } = supabase.auth.onAuthStateChange(async (_event, session) => {
-          if (session) {
-            // Real session – always override (includes guest mode)
-            setSession(session);
-            setUser(session.user);
-            setIsGuest(false);
-            setLoading(false);
-            if (_event === "SIGNED_IN") {
-              await ensureProfile(session.user.id);
-            }
-          } else if (_event === "SIGNED_OUT") {
-            // Explicit sign-out – clear everything including guest mode
-            setSession(null);
-            setUser(null);
-            setIsGuest(false);
-            setLoading(false);
-          } else {
-            // INITIAL_SESSION or TOKEN_REFRESHED with no session –
-            // do NOT clear guest mode (avoids race with signInAsGuest)
-            setLoading(false);
+    try {
+      const {
+        data: { subscription: sub },
+      } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+        if (nextSession) {
+          writeGuestFlag(false);
+          setSession(nextSession);
+          setUser(nextSession.user);
+          setIsGuest(false);
+          setLoading(false);
+          if (event === "SIGNED_IN") {
+            await ensureProfile(nextSession.user.id);
           }
-        });
-        subscription = sub;
-      } catch (error) {
-        // If onAuthStateChange fails, just log and continue
-        if (import.meta.env.DEV) {
-          console.error("Error setting up auth state listener:", error);
+        } else if (event === "SIGNED_OUT") {
+          writeGuestFlag(false);
+          setSession(null);
+          setUser(null);
+          setIsGuest(false);
+          setLoading(false);
+        } else {
+          setLoading(false);
         }
-        setLoading(false);
-      }
-    } catch (error) {
-      // Catch any synchronous errors
-      if (import.meta.env.DEV) {
-        console.error("Error in auth initialization:", error);
-      }
+      });
+      subscription = sub;
+    } catch {
       setLoading(false);
     }
 
@@ -166,113 +143,91 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (subscription) {
         try {
           subscription.unsubscribe();
-        } catch (error) {
-          // Ignore unsubscribe errors
-          if (import.meta.env.DEV) {
-            console.warn("Error unsubscribing from auth:", error);
-          }
+        } catch {
+          /* ignore */
         }
       }
     };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<AuthResult> => {
     if (!isSupabaseConfigured) {
       return { data: null, error: { message: "Supabase is not configured", name: "ConfigurationError" } as AuthError };
     }
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    // Immediately update context state if session was created
-    // This avoids race conditions with navigation
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (data?.session && !error) {
+      writeGuestFlag(false);
       setSession(data.session);
       setUser(data.session.user);
-      setIsGuest(false); // Clear guest mode when real user signs in
+      setIsGuest(false);
       setLoading(false);
     }
-    
-    // Return both data and error for consistency with signUp
-    // onAuthStateChange will also fire, but we've already updated state
     return { data, error };
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string): Promise<AuthResult> => {
     if (!isSupabaseConfigured) {
       return { data: null, error: { message: "Supabase is not configured", name: "ConfigurationError" } as AuthError };
     }
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    
-    // Immediately update context state if session was created
-    // This avoids race conditions with navigation
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (data?.session && !error) {
+      writeGuestFlag(false);
       setSession(data.session);
       setUser(data.session.user);
-      setIsGuest(false); // Clear guest mode when real user signs up
+      setIsGuest(false);
       setLoading(false);
-      // Ensure profile exists for new user
       await ensureProfile(data.session.user.id);
     }
-    
-    // Return both data and error so the caller can check if session was created immediately
-    // (happens when email confirmation is disabled)
-    // onAuthStateChange will also fire, but we've already updated state
     return { data, error };
   };
 
   const signOut = async () => {
-    // If guest user, just clear context state without calling Supabase
     if (isGuest) {
+      writeGuestFlag(false);
       setUser(null);
       setSession(null);
       setIsGuest(false);
       setLoading(false);
       return;
     }
-    
-    // For real users, sign out from Supabase
-    if (!isSupabaseConfigured) return;
-    await supabase.auth.signOut();
-  };
-
-  const signInWithGoogle = async () => {
-    if (!isSupabaseConfigured) {
-      return { error: { message: "Supabase is not configured", name: "ConfigurationError" } as AuthError };
+    // Clear Supabase's own storage synchronously to prevent stale sessions
+    // from being picked up on the next page load.
+    if (typeof window !== "undefined") {
+      try {
+        for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+          const key = window.localStorage.key(i);
+          if (key && (key.startsWith("sb-") || key === "supabase.auth.token")) {
+            window.localStorage.removeItem(key);
+          }
+        }
+      } catch {
+        /* ignore */
+      }
     }
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}${import.meta.env.PROD ? "/calm-desk-companion" : ""}/auth/callback`,
-      },
+    setSession(null);
+    setUser(null);
+    setIsGuest(false);
+    setLoading(false);
+    if (!isSupabaseConfigured) return;
+    // Fire the server call in the background with a short timeout to avoid
+    // hangs from the internal lock in supabase-js.
+    void Promise.race([
+      supabase.auth.signOut({ scope: "local" }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("signOut-timeout")), 2000)),
+    ]).catch(() => {
+      /* best-effort — the session will expire on its own */
     });
-    return { error };
   };
 
   const signInAsGuest = () => {
-    // Create a fake user object for guest mode
-    // This does NOT use Supabase - it's purely local state
-    const guestUser: User = {
-      id: "guest",
-      email: "guest@demo.local",
-      aud: "authenticated",
-      role: "authenticated",
-      created_at: new Date().toISOString(),
-      app_metadata: {},
-      user_metadata: {},
-    };
-
-    setUser(guestUser);
-    setSession(null); // No real session for guest
+    writeGuestFlag(true);
+    setUser(guestUserSingleton);
+    setSession(null);
     setIsGuest(true);
     setLoading(false);
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     session,
     loading,
@@ -280,10 +235,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     signIn,
     signUp,
     signOut,
-    signInWithGoogle,
     signInAsGuest,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
