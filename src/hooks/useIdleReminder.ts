@@ -18,7 +18,7 @@ export function useIdleReminder(onRemind: () => void) {
 
   const markActivity = useCallback(() => {
     lastActivityRef.current = Date.now();
-    setIdleReminderShown((prev) => (prev ? false : prev));
+    setIdleReminderShown(false);
   }, []);
 
   useEffect(() => {
