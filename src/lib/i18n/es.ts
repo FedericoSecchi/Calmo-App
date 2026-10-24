@@ -286,6 +286,10 @@ export const es: Dict = {
       },
     },
     timer: {
+      titles: {
+        focus: "Foco",
+        rest: "Pausa",
+      },
       toasts: {
         restStartedTitle: "Tiempo de descanso",
         restStartedDesc: "Tomate {min} minutos.",
@@ -301,6 +305,25 @@ export const es: Dict = {
         timeToBreakBody: "Pará y moveté. Tomate un descanso.",
         breakCompletedTitle: "Pausa completada",
         breakCompletedBody: "¡Bien hecho! Volvé al trabajo.",
+        preEndWorkTitle: "El foco termina pronto",
+        preEndWorkBody: "Quedan {min} min de foco.",
+        preEndRestTitle: "La pausa termina pronto",
+        preEndRestBody: "Quedan {min} min de pausa.",
+      },
+      preEnd: {
+        workBanner: "Quedan {min} min de foco",
+        restBanner: "Quedan {min} min de pausa",
+        dismiss: "Descartar",
+      },
+      pip: {
+        open: "Ventana flotante",
+        openAria: "Abrir temporizador en ventana flotante",
+        close: "Cerrar ventana flotante",
+        pause: "Pausar",
+        start: "Iniciar",
+        skip: "Saltar",
+        focusLabel: "Foco",
+        restLabel: "Pausa",
       },
     },
     exercises: {
@@ -556,6 +579,17 @@ export const es: Dict = {
       sounds: {
         on: "Activado",
         off: "Desactivado",
+      },
+      volume: "Volumen",
+      volumeHint: "Timbres de fin y aviso más fuertes y audibles.",
+      testSound: "Probar sonido",
+      warnBefore: "Avisar antes de terminar",
+      warnBeforeHint: "Un sonido suave unos minutos antes de que termine cada fase.",
+      warnBeforeOptions: {
+        off: "Desactivado",
+        oneMin: "1 min",
+        twoMin: "2 min",
+        fiveMin: "5 min",
       },
       darkMode: "Modo oscuro",
       language: "Idioma",

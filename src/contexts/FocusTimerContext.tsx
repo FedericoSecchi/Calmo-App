@@ -18,6 +18,15 @@ import { useToast } from "@/hooks/use-toast";
 import { useReminderSettings } from "@/hooks/useReminderSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { useT, format as fmt } from "@/lib/i18n";
+import { useTimerPrefs, type WarnBeforeSec } from "@/hooks/useTimerPrefs";
+import {
+  playFocusEndSound,
+  playBreakEndSound,
+  playPreEndSound,
+  playCountdownBlip,
+} from "@/lib/timerAudio";
+import { shouldFirePreEndWarning, formatTimerTitle } from "@/lib/timer";
+import { track } from "@/lib/analytics";
 
 const TIMER_STORAGE_KEY = "calmo_reminder_timer_state";
 
@@ -67,12 +76,18 @@ interface FocusTimerContextType {
   isRunning: boolean;
   selectedPreset: PresetId;
   soundEnabled: boolean;
+  volume: number; // 0..100
+  warnBeforeSec: WarnBeforeSec;
+  preEndWarning: { visible: boolean; phase: TimerPhase; seconds: number } | null;
+  pipSupported: boolean;
+  pipOpen: boolean;
+  pipRoot: HTMLElement | null;
   lastRestCompletion: number; // Timestamp of last REST completion (for exercise recommendation)
   showEndOfFocusDialog: boolean; // Flag to show end-of-focus UI when REST completes
   providerId: string; // Unique ID to prove single provider instance
   workElapsedSeconds: number; // Total WORK time elapsed (only increments during WORK phase when running)
   screenBreak: ScreenBreakState;
-  
+
   // Actions
   startTimer: () => void;
   pauseTimer: () => void;
@@ -81,10 +96,16 @@ interface FocusTimerContextType {
   setPreset: (preset: PresetId) => void;
   setCustomTimings: (workMinutes: number, restMinutes: number) => void; // Set custom timings (session-only, doesn't persist)
   setSoundEnabled: (enabled: boolean) => void;
+  setVolume: (volume: number) => void;
+  setWarnBeforeSec: (sec: number) => void;
+  playTestSound: () => void;
+  openPipWindow: () => Promise<void>;
+  closePipWindow: () => void;
+  dismissPreEndWarning: () => void;
   dismissEndOfFocusDialog: () => void; // Dismiss the end-of-focus dialog
   dismissScreenBreak: () => void; // Dismiss screen break (Listo)
   snoozeScreenBreak: () => void; // Snooze screen break for 5 minutes
-  
+
   // Helpers
   getPresetConfig: (presetId: PresetId) => PresetConfig;
   formatTime: (seconds: number) => string;
@@ -110,6 +131,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
   const { t } = useT();
   const { settings, updateSettings } = useReminderSettings();
   const { logBreak } = useBreakLogs();
+  const { volume, setVolume, warnBeforeSec, setWarnBeforeSec } = useTimerPrefs();
   
   // Create stable unique ID for this provider instance (proves single provider)
   const getProviderId = () => {
@@ -252,95 +274,56 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
   const phaseTransitionRef = useRef(false);
   const lastTransitionTimestampRef = useRef<number>(0);
 
+  // Audio volume scalar (0..1), derived from the user's 0..100 slider.
+  const effectiveVolume = soundEnabled ? volume / 100 : 0;
+  const effectiveVolumeRef = useRef(effectiveVolume);
+  useEffect(() => {
+    effectiveVolumeRef.current = effectiveVolume;
+  }, [effectiveVolume]);
+
+  // Pre-end warning tracking.
+  const initialPhaseSecondsRef = useRef<number>(timeRemaining);
+  const previousRemainingRef = useRef<number>(timeRemaining);
+  const preEndFiredRef = useRef<boolean>(false);
+  const warnBeforeRef = useRef<WarnBeforeSec>(warnBeforeSec);
+  useEffect(() => {
+    warnBeforeRef.current = warnBeforeSec;
+  }, [warnBeforeSec]);
+  const [preEndWarning, setPreEndWarning] = useState<
+    { visible: boolean; phase: TimerPhase; seconds: number } | null
+  >(null);
+  const preEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Document Picture-in-Picture.
+  const pipWindowRef = useRef<Window | null>(null);
+  const pipSupported =
+    typeof window !== "undefined" && "documentPictureInPicture" in window;
+  const [pipOpen, setPipOpen] = useState(false);
+  const [pipRoot, setPipRoot] = useState<HTMLDivElement | null>(null);
+
   // Helper function to trigger notification and sound
-  const triggerNotificationAndSound = useCallback((title: string, body: string, isWorkToRest: boolean) => {
-    // Trigger notification
-    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      try {
-        new Notification(title, { body, icon: "/icon-192.png" });
-      } catch {
-        /* ignore */
-      }
-    }
-    
-    // Play sound if enabled
-    if (soundEnabled) {
-      try {
-        const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = isWorkToRest ? 800 : 600;
-        oscillator.type = "sine";
-        
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.5);
-      } catch (e) {
-        if (import.meta.env.DEV) {
-          console.debug("Audio notification failed:", e);
+  const triggerNotificationAndSound = useCallback(
+    (title: string, body: string, isWorkToRest: boolean) => {
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        try {
+          new Notification(title, { body, icon: "/icon-192.png" });
+        } catch {
+          /* ignore */
         }
       }
-    }
-  }, [soundEnabled]);
-
-  // Countdown alert tracking
-  const countdownAlertsRef = useRef<Set<number>>(new Set());
-  const lastCountdownSecondRef = useRef<number>(-1);
-
-  // Helper to play subtle countdown sound
-  const playCountdownSound = useCallback((seconds: number) => {
-    if (!soundEnabled) return;
-    
-    try {
-      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      // Different frequency based on urgency (higher = more urgent)
-      oscillator.frequency.value = seconds <= 3 ? 1000 : 600;
-      oscillator.type = "sine";
-      
-      // Very subtle sound for countdown
-      gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-      
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.2);
-    } catch (e) {
-      if (import.meta.env.DEV) {
-        console.debug("Countdown sound failed:", e);
+      const v = effectiveVolumeRef.current;
+      if (v > 0) {
+        if (isWorkToRest) {
+          playFocusEndSound(v);
+        } else {
+          playBreakEndSound(v);
+        }
       }
-    }
-  }, [soundEnabled]);
+    },
+    [],
+  );
 
-  // Helper to play subtle beep sound
-  const playBeep = useCallback((frequency: number = 800, duration: number = 0.1) => {
-    if (!soundEnabled) return;
-    try {
-      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      oscillator.frequency.value = frequency;
-      oscillator.type = "sine";
-      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + duration);
-    } catch (e) {
-      // Silent fail
-    }
-  }, [soundEnabled]);
+  const lastCountdownSecondRef = useRef<number>(-1);
 
   // Timer countdown logic - uses Date.now() diff for accuracy
   const workStartTimeRef = useRef<number | null>(null);
@@ -385,7 +368,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
             workElapsed >= screenBreak.snoozeTargetWorkElapsed;
           
           if (shouldTrigger || shouldTriggerSnooze) {
-            playBeep(600, 0.15);
+            playCountdownBlip(effectiveVolumeRef.current, 5);
             setScreenBreak(prev => ({
               isOpen: true,
               countdownSeconds: 20,
@@ -401,13 +384,53 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
             lastWorkElapsedRef.current = workElapsedSeconds;
           }
         }
-        
+
+        // Pre-end warning (fire once per phase when crossing threshold).
+        const prevRemaining = previousRemainingRef.current;
+        if (
+          shouldFirePreEndWarning({
+            initialPhaseSeconds: initialPhaseSecondsRef.current,
+            remainingSeconds: newRemaining,
+            previousRemainingSeconds: prevRemaining,
+            warnBeforeSec: warnBeforeRef.current,
+            alreadyFired: preEndFiredRef.current,
+          })
+        ) {
+          preEndFiredRef.current = true;
+          const warnSec = warnBeforeRef.current;
+          playPreEndSound(effectiveVolumeRef.current);
+          setPreEndWarning({ visible: true, phase: currentPhase, seconds: warnSec });
+          if (preEndTimeoutRef.current) clearTimeout(preEndTimeoutRef.current);
+          preEndTimeoutRef.current = setTimeout(() => {
+            setPreEndWarning(null);
+          }, 12_000);
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+            try {
+              const minutes = Math.round(warnSec / 60);
+              const title =
+                currentPhase === "work"
+                  ? t.app.timer.notifications.preEndWorkTitle
+                  : t.app.timer.notifications.preEndRestTitle;
+              const body = fmt(
+                currentPhase === "work"
+                  ? t.app.timer.notifications.preEndWorkBody
+                  : t.app.timer.notifications.preEndRestBody,
+                { min: minutes },
+              );
+              new Notification(title, { body, icon: "/icon-192.png" });
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        previousRemainingRef.current = newRemaining;
+
         // Countdown alerts at 10, 5, 3, 2, 1 seconds
         const alertSeconds = [10, 5, 3, 2, 1];
         if (alertSeconds.includes(currentSecond) && currentSecond !== lastCountdownSecondRef.current) {
           lastCountdownSecondRef.current = currentSecond;
-          playCountdownSound(currentSecond);
-          
+          playCountdownBlip(effectiveVolumeRef.current, currentSecond);
+
           // Show subtle toast for final seconds (1-3)
           if (currentSecond <= 3) {
             const title =
@@ -426,7 +449,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
             });
           }
         }
-        
+
         if (newRemaining === 0) {
           setIsRunning(false);
           lastCountdownSecondRef.current = -1; // Reset for next phase
@@ -445,7 +468,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
           clearInterval(intervalRef.current);
         }
       };
-    }, [isRunning, timeRemaining, currentPhase, playCountdownSound, toast, screenBreak.isOpen, screenBreak.lastTriggerWorkElapsed, screenBreak.snoozeTargetWorkElapsed, workElapsedSeconds, playBeep]);
+    }, [isRunning, timeRemaining, currentPhase, toast, screenBreak.isOpen, screenBreak.lastTriggerWorkElapsed, screenBreak.snoozeTargetWorkElapsed, workElapsedSeconds, t]);
 
   // Handle timer completion and phase transitions
   useEffect(() => {
@@ -533,7 +556,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
         setScreenBreak(prev => {
           if (prev.countdownSeconds <= 1) {
             // Auto-dismiss when countdown reaches 0
-            playBeep(800, 0.15);
+            playCountdownBlip(effectiveVolumeRef.current, 1);
             const today = new Date().toDateString();
             localStorage.setItem(SCREEN_BREAK_STORAGE_KEY, JSON.stringify({
               date: today,
@@ -554,7 +577,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
       
       return () => clearInterval(countdownInterval);
     }
-  }, [screenBreak.isOpen, screenBreak.countdownSeconds, isRunning, currentPhase, screenBreak.lastTriggerWorkElapsed, playBeep]);
+  }, [screenBreak.isOpen, screenBreak.countdownSeconds, isRunning, currentPhase, screenBreak.lastTriggerWorkElapsed]);
 
   // Reset work elapsed on phase transition
   useEffect(() => {
@@ -699,12 +722,149 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
+  const playTestSound = useCallback(() => {
+    const v = soundEnabled ? volume / 100 : volume / 100;
+    playFocusEndSound(v > 0 ? v : 0.5);
+  }, [soundEnabled, volume]);
+
+  const dismissPreEndWarning = useCallback(() => {
+    if (preEndTimeoutRef.current) {
+      clearTimeout(preEndTimeoutRef.current);
+      preEndTimeoutRef.current = null;
+    }
+    setPreEndWarning(null);
+  }, []);
+
+  const closePipWindow = useCallback(() => {
+    if (pipWindowRef.current) {
+      try {
+        pipWindowRef.current.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    pipWindowRef.current = null;
+    setPipRoot(null);
+    setPipOpen(false);
+  }, []);
+
+  const openPipWindow = useCallback(async () => {
+    if (!pipSupported || typeof window === "undefined") return;
+    if (pipWindowRef.current) {
+      try {
+        pipWindowRef.current.focus();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    try {
+      const api = (window as unknown as {
+        documentPictureInPicture: { requestWindow: (opts: { width: number; height: number }) => Promise<Window> };
+      }).documentPictureInPicture;
+      const pipWin = await api.requestWindow({ width: 320, height: 180 });
+      // Copy host stylesheets into the PiP document so Calmo styles apply.
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          const styleTag = pipWin.document.createElement("style");
+          const rules = Array.from((sheet as CSSStyleSheet).cssRules ?? []);
+          styleTag.textContent = rules.map((r) => r.cssText).join("\n");
+          pipWin.document.head.appendChild(styleTag);
+        } catch {
+          if ((sheet as CSSStyleSheet).href) {
+            const link = pipWin.document.createElement("link");
+            link.rel = "stylesheet";
+            link.href = (sheet as CSSStyleSheet).href as string;
+            pipWin.document.head.appendChild(link);
+          }
+        }
+      }
+      pipWin.document.body.classList.add(...document.body.classList);
+      pipWin.document.documentElement.classList.add(...document.documentElement.classList);
+      pipWin.document.body.style.margin = "0";
+      pipWin.document.body.style.background = "transparent";
+      const root = pipWin.document.createElement("div");
+      root.id = "calmo-pip-root";
+      pipWin.document.body.appendChild(root);
+      pipWindowRef.current = pipWin;
+      setPipRoot(root);
+      setPipOpen(true);
+      track("focus_started", { via: "pip" });
+      pipWin.addEventListener("pagehide", () => {
+        pipWindowRef.current = null;
+        setPipRoot(null);
+        setPipOpen(false);
+      });
+    } catch {
+      /* feature failed — leave state unchanged */
+    }
+  }, [pipSupported]);
+
+  // Reset pre-end warning tracking on phase change / preset change.
+  useEffect(() => {
+    const config = getPresetConfig(selectedPreset);
+    const phaseTotal =
+      currentPhase === "work"
+        ? config.workMinutes * 60
+        : (customRestMinutes ?? config.restMinutes) * 60;
+    initialPhaseSecondsRef.current = phaseTotal;
+    previousRemainingRef.current = timeRemaining;
+    preEndFiredRef.current = false;
+    setPreEndWarning(null);
+    if (preEndTimeoutRef.current) {
+      clearTimeout(preEndTimeoutRef.current);
+      preEndTimeoutRef.current = null;
+    }
+    // We intentionally do NOT depend on timeRemaining — we only want to
+    // reset when the phase or preset changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPhase, selectedPreset, customRestMinutes]);
+
+  // Tab title countdown while the timer is running.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const defaultTitle = `${t.meta.siteName} — ${t.meta.tagline}`;
+    if (!isRunning) {
+      document.title = defaultTitle;
+      return;
+    }
+    const phaseLabel =
+      currentPhase === "work" ? t.app.timer.titles.focus : t.app.timer.titles.rest;
+    document.title = formatTimerTitle({
+      remainingSeconds: timeRemaining,
+      phaseLabel,
+      siteName: t.meta.siteName,
+    });
+    return () => {
+      document.title = defaultTitle;
+    };
+  }, [isRunning, currentPhase, timeRemaining, t]);
+
+  // Close PiP window when the host document unmounts.
+  useEffect(() => {
+    return () => {
+      if (pipWindowRef.current) {
+        try {
+          pipWindowRef.current.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, []);
+
   const value: FocusTimerContextType = {
     currentPhase,
     timeRemaining,
     isRunning,
     selectedPreset,
     soundEnabled,
+    volume,
+    warnBeforeSec,
+    preEndWarning,
+    pipSupported,
+    pipOpen,
+    pipRoot,
     lastRestCompletion,
     showEndOfFocusDialog,
     providerId,
@@ -717,6 +877,12 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     setPreset,
     setCustomTimings,
     setSoundEnabled,
+    setVolume,
+    setWarnBeforeSec,
+    playTestSound,
+    openPipWindow,
+    closePipWindow,
+    dismissPreEndWarning,
     dismissEndOfFocusDialog,
     dismissScreenBreak,
     snoozeScreenBreak,

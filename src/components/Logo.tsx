@@ -4,23 +4,25 @@ import { Leaf } from "lucide-react";
 interface LogoProps {
   size?: "sm" | "md" | "lg";
   showText?: boolean;
+  asLink?: boolean;
+  to?: string;
 }
 
-export const Logo = ({ size = "md", showText = true }: LogoProps) => {
+export const Logo = ({ size = "md", showText = true, asLink = true, to = "/" }: LogoProps) => {
   const sizeClasses = {
     sm: "h-6 w-6",
     md: "h-8 w-8",
     lg: "h-10 w-10"
   };
-  
+
   const textSizes = {
     sm: "text-lg",
     md: "text-xl",
     lg: "text-2xl"
   };
 
-  return (
-    <Link to="/" className="flex items-center gap-2 group">
+  const inner = (
+    <>
       <div className={`${sizeClasses[size]} rounded-xl bg-primary flex items-center justify-center transition-transform group-hover:scale-105`}>
         <Leaf className="h-[60%] w-[60%] text-primary-foreground" />
       </div>
@@ -29,6 +31,16 @@ export const Logo = ({ size = "md", showText = true }: LogoProps) => {
           Calmo
         </span>
       )}
+    </>
+  );
+
+  if (!asLink) {
+    return <span className="flex items-center gap-2 group">{inner}</span>;
+  }
+
+  return (
+    <Link to={to} className="flex items-center gap-2 group">
+      {inner}
     </Link>
   );
 };

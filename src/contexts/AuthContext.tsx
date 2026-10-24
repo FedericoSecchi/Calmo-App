@@ -190,33 +190,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setLoading(false);
       return;
     }
-    // Clear Supabase's own storage synchronously to prevent stale sessions
-    // from being picked up on the next page load.
-    if (typeof window !== "undefined") {
+    if (isSupabaseConfigured) {
       try {
-        for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
-          const key = window.localStorage.key(i);
-          if (key && (key.startsWith("sb-") || key === "supabase.auth.token")) {
-            window.localStorage.removeItem(key);
-          }
-        }
+        await supabase.auth.signOut({ scope: "local" });
       } catch {
-        /* ignore */
+        /* best-effort — the session will expire on its own */
       }
     }
     setSession(null);
     setUser(null);
     setIsGuest(false);
     setLoading(false);
-    if (!isSupabaseConfigured) return;
-    // Fire the server call in the background with a short timeout to avoid
-    // hangs from the internal lock in supabase-js.
-    void Promise.race([
-      supabase.auth.signOut({ scope: "local" }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("signOut-timeout")), 2000)),
-    ]).catch(() => {
-      /* best-effort — the session will expire on its own */
-    });
   };
 
   const signInAsGuest = () => {

@@ -13,7 +13,6 @@ test.describe("Account round-trip", () => {
   });
 
   test("sign up → sign out → login → delete account", async ({ browser }) => {
-    test.setTimeout(180_000);
     const email = e2eEmail();
     createdEmail = email;
 
@@ -28,12 +27,8 @@ test.describe("Account round-trip", () => {
     await expect(page).toHaveURL(/\/app/, { timeout: 20_000 });
 
     await page.goto("/app/settings");
-    // Fire the sign-out and close the context without waiting for the SPA to
-    // navigate; we verify logout succeeded by opening a fresh context below.
-    // supabase-js holds an in-process lock inside the first context that can
-    // keep its own React state attached to the stale user for a few seconds.
     await page.getByRole("button", { name: /^sign out$/i }).click();
-    await page.waitForTimeout(500);
+    await expect(page).toHaveURL(/\/auth/, { timeout: 10_000 });
     await ctx1.close();
 
     // Context 2: login from scratch, delete account

@@ -18,7 +18,7 @@ src/
   main.tsx              — bootstrap
   contexts/
     AuthContext.tsx     — email+pass + modo invitado (sin OAuth)
-    FocusTimerContext.tsx — timer y pausas de pantalla
+    FocusTimerContext.tsx — timer, aviso pre-fin, título de pestaña, Document Picture-in-Picture
   hooks/
     useWaterLogs.ts     — vasos (server auth; localStorage invitado)
     useBreakLogs.ts     — pausas realizadas (server auth; localStorage invitado)
@@ -26,12 +26,15 @@ src/
     usePainRecords.ts   — SOLO localStorage, en ambos modos
     useExerciseCompletions.ts — ejercicios (server auth; localStorage invitado)
     useReminderSettings.ts — ajustes de recordatorios (server)
+    useTimerPrefs.ts    — volumen (0-100) y aviso previo (0/60/120/300 s), SOLO localStorage en ambos modos
   lib/
     supabaseClient.ts
     analytics.ts        — track() anónimo (session_id en memoria)
     i18n/               — diccionarios en/es tipados
     exercises.ts
     prerender.ts        — helpers de hidratación segura
+    timer.ts            — helpers puros (`shouldFirePreEndWarning`, `formatTimerTitle`)
+    timerAudio.ts       — tonos sintetizados con Web Audio (focus end, break end, pre-end, countdown)
   pages/
     Index.tsx           — landing (en por defecto; variantes /es/)
     Auth.tsx            — email+pass con mensajes claros
@@ -47,10 +50,11 @@ scripts/
   generate-og-images.mjs
 supabase/migrations/    — 002/003/004/005 (001 obsoleto)
 tests/
-  unit/                 — vitest (timer, stats, breathing)
-  e2e/                  — Playwright (invitado, cuenta round-trip, idioma, waitlist, i18n-app)
+  unit/                 — vitest (timer, stats, breathing, timer logic/warn/title)
+  e2e/                  — Playwright (invitado, cuenta round-trip, idioma, waitlist, i18n-app, timer)
     i18n-app.spec.ts    — renderiza cada pantalla en inglés y falla si encuentra palabras típicas en español
     account.spec.ts     — round-trip de cuenta usando contextos de navegador separados
+    timer.spec.ts       — título de pestaña + persistencia de volumen + feature-detection de PiP
     helpers.ts          — helpers (deleteAccountByCredentials, e2eEmail)
 scripts/verify.sh       — ciclo de verificación local
 ```
@@ -61,8 +65,9 @@ scripts/verify.sh       — ciclo de verificación local
 - Idiomas: **inglés en la raíz** con slugs actuales; **español bajo `/es/`** con slugs en español. hreflang en/es + x-default → inglés.
 - **i18n completa en la app**: todo texto visible (Dashboard, Reminders, Exercises, Pain, Settings, Onboarding, Auth, dialogs, toasts, errores) sale del diccionario tipado en `src/lib/i18n/{en,es}.ts`. En las páginas públicas el idioma lo define la URL; en la app, la preferencia guardada → navegador → inglés.
 - **Privacidad mínima**: sin cookies de terceros, sin GA, sin banner. Fuentes locales. Analítica propia anónima (`events`) con `session_id` en memoria. La analítica se omite en navegadores automatizados (Playwright, Lighthouse) para no inflar métricas.
-- Auth: email + contraseña nomás. Sin Google OAuth. Confirmación por email desactivada en Supabase; sin "forgot password" (no hay SMTP). `persistSession: true` siempre (sin workaround específico para automatización).
-- Borrado de cuenta: `delete_my_account` se llama vía `fetch` directo al endpoint REST para evitar el lock interno de `supabase-js` durante la transición de logout; después se limpian los `sb-*` tokens de `localStorage`.
+- Auth: email + contraseña nomás. Sin Google OAuth. Confirmación por email desactivada en Supabase; sin "forgot password" (no hay SMTP). `persistSession: true` siempre.
+- `@supabase/supabase-js` 2.118+ (v2.107 reemplazó `navigator.locks` por un commit guard). Mantener actualizado: login/logout/delete deben completar en segundos. Si vuelve a aparecer latencia, revisar changelog de auth antes de agregar workarounds.
+- Borrado de cuenta: `supabase.rpc("delete_my_account")` seguido de `supabase.auth.signOut({ scope: "local" })`. Sin REST directo ni limpieza manual de `sb-*`.
 - **Dolor solo en el dispositivo** (localStorage), también para usuarios logueados. La UI lo dice en una línea.
 - **Plan Pro en lista de espera** (USD 4,99/mes, "en desarrollo"), inserta en `waitlist` (unique email → duplicado es éxito). Tests envían `source="e2e"` vía `?source=e2e` para filtrar métricas.
 - No agregar features ni abstracciones no pedidas. No logs de debug en prod.

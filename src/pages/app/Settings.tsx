@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { LogOut, Globe, Volume2, VolumeX, Moon, Sun, AlertTriangle, Trash2, HardDriveDownload } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { LogOut, Globe, Volume2, VolumeX, Moon, Sun, AlertTriangle, Trash2, HardDriveDownload, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFocusTimer } from "@/contexts/FocusTimerContext";
@@ -26,8 +27,23 @@ const Settings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { signOut, user, isGuest } = useAuth();
-  const { soundEnabled, setSoundEnabled } = useFocusTimer();
+  const {
+    soundEnabled,
+    setSoundEnabled,
+    volume,
+    setVolume,
+    warnBeforeSec,
+    setWarnBeforeSec,
+    playTestSound,
+  } = useFocusTimer();
   const { t, lang } = useT();
+
+  const warnOptions: Array<{ value: number; label: string }> = [
+    { value: 0, label: t.app.settings.warnBeforeOptions.off },
+    { value: 60, label: t.app.settings.warnBeforeOptions.oneMin },
+    { value: 120, label: t.app.settings.warnBeforeOptions.twoMin },
+    { value: 300, label: t.app.settings.warnBeforeOptions.fiveMin },
+  ];
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const stored = typeof window !== "undefined" ? window.localStorage.getItem("calmo_dark_mode") : null;
@@ -75,50 +91,14 @@ const Settings = () => {
   };
 
   const handleDeleteAccount = async () => {
-    // Hit the REST endpoint directly to sidestep the supabase-js lock that
-    // can block rpc() calls during logout-adjacent transitions. Read the
-    // bearer token straight from the storage key supabase-js writes.
-    try {
-      if (isSupabaseConfigured) {
-        const url = import.meta.env.VITE_SUPABASE_URL as string;
-        const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-        let token: string | null = null;
-        for (let i = 0; i < window.localStorage.length; i += 1) {
-          const storageKey = window.localStorage.key(i);
-          if (storageKey && storageKey.startsWith("sb-") && storageKey.endsWith("-auth-token")) {
-            try {
-              const raw = window.localStorage.getItem(storageKey);
-              const parsed = raw ? JSON.parse(raw) : null;
-              token = (parsed && parsed.access_token) || null;
-            } catch {
-              /* ignore */
-            }
-            break;
-          }
-        }
-        if (token && url && key) {
-          await fetch(`${url}/rest/v1/rpc/delete_my_account`, {
-            method: "POST",
-            headers: {
-              apikey: key,
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          });
-        }
-      }
-    } catch {
-      /* best-effort */
-    }
-    // Clear Supabase local auth tokens directly to avoid the signOut lock.
-    if (typeof window !== "undefined") {
+    if (isSupabaseConfigured) {
       try {
-        for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
-          const key = window.localStorage.key(i);
-          if (key && (key.startsWith("sb-") || key === "supabase.auth.token")) {
-            window.localStorage.removeItem(key);
-          }
-        }
+        await supabase.rpc("delete_my_account");
+      } catch {
+        /* best-effort */
+      }
+      try {
+        await supabase.auth.signOut({ scope: "local" });
       } catch {
         /* ignore */
       }
@@ -164,6 +144,62 @@ const Settings = () => {
             </div>
           </div>
         </button>
+
+        <div className="bg-card rounded-2xl p-4 border border-border/50 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Volume2 className="h-5 w-5 text-primary" />
+              <div>
+                <p className="font-medium">{t.app.settings.volume}</p>
+                <p className="text-sm text-muted-foreground">{t.app.settings.volumeHint}</p>
+              </div>
+            </div>
+            <span className="text-sm font-mono text-muted-foreground tabular-nums w-10 text-right">
+              {volume}
+            </span>
+          </div>
+          <Slider
+            aria-label={t.app.settings.volume}
+            value={[volume]}
+            min={0}
+            max={100}
+            step={1}
+            onValueChange={(v) => setVolume(v[0] ?? 0)}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={playTestSound}
+            disabled={!soundEnabled || volume === 0}
+          >
+            {t.app.settings.testSound}
+          </Button>
+        </div>
+
+        <div className="bg-card rounded-2xl p-4 border border-border/50">
+          <div className="flex items-center gap-3 mb-3">
+            <Clock className="h-5 w-5 text-primary" />
+            <div>
+              <p className="font-medium">{t.app.settings.warnBefore}</p>
+              <p className="text-sm text-muted-foreground">{t.app.settings.warnBeforeHint}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {warnOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setWarnBeforeSec(option.value)}
+                className={`p-2 rounded-xl border-2 text-xs font-medium transition-all ${
+                  warnBeforeSec === option.value
+                    ? "border-primary bg-primary/5 text-foreground"
+                    : "border-border text-muted-foreground hover:border-border/80"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <button
           onClick={() => setIsDarkMode(!isDarkMode)}

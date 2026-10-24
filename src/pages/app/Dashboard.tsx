@@ -11,6 +11,7 @@ import {
   Brain,
   SkipForward,
   TrendingUp,
+  PictureInPicture2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
@@ -39,6 +40,10 @@ const Dashboard = () => {
     formatTime,
     toggleTimer,
     skipToNextPhase,
+    pipSupported,
+    pipOpen,
+    openPipWindow,
+    closePipWindow,
   } = useFocusTimer();
 
   const currentPresetName = t.app.presets[selectedPreset].name;
@@ -123,6 +128,16 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground mt-0.5">{presetSubline}</p>
             </div>
             <div className="flex items-center gap-2">
+              {pipSupported && (
+                <button
+                  onClick={() => (pipOpen ? closePipWindow() : openPipWindow())}
+                  className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground"
+                  aria-label={t.app.timer.pip.openAria}
+                  data-testid="pip-toggle"
+                >
+                  <PictureInPicture2 className="h-5 w-5" />
+                </button>
+              )}
               <button
                 onClick={skipToNextPhase}
                 className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground"

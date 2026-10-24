@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { EndOfFocusDialog } from "@/components/EndOfFocusDialog";
 import { ScreenBreakBanner } from "@/components/ScreenBreakBanner";
+import { PreEndWarningBanner } from "@/components/PreEndWarningBanner";
+import { PipTimerWindow } from "@/components/PipTimerWindow";
 import { AppBackground } from "@/components/AppBackground";
 import { Footer } from "@/components/Footer";
 import { useFocusTimer } from "@/contexts/FocusTimerContext";
@@ -51,6 +53,8 @@ const AppLayout = () => {
       <div className="relative z-10 min-h-screen bg-background">
         <EndOfFocusDialog open={showEndOfFocusDialog} onClose={dismissEndOfFocusDialog} />
         <ScreenBreakBanner />
+        <PreEndWarningBanner />
+        <PipTimerWindow />
         <div
           className="fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-40 flex items-center justify-between px-4"
           style={{ paddingTop: "env(safe-area-inset-top)" }}

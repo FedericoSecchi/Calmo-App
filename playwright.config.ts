@@ -4,13 +4,11 @@ const PORT = 4173;
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  // 90s per test; the overall budget includes context teardown, which can
-  // take tens of seconds when the Supabase client leaves background refresh
-  // timers / broadcast channels open after a run against production.
-  timeout: 90_000,
+  timeout: 30_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
-  retries: 2,
+  workers: 1,
+  retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["line"]] : "list",
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`,

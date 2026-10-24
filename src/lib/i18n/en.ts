@@ -285,6 +285,10 @@ export const en = {
       },
     },
     timer: {
+      titles: {
+        focus: "Focus",
+        rest: "Break",
+      },
       toasts: {
         restStartedTitle: "Rest time",
         restStartedDesc: "Take {min} minutes off.",
@@ -300,6 +304,25 @@ export const en = {
         timeToBreakBody: "Stand up and move. Take a break.",
         breakCompletedTitle: "Break completed",
         breakCompletedBody: "Nice work! Back to work.",
+        preEndWorkTitle: "Focus wrapping up",
+        preEndWorkBody: "{min} min of focus left.",
+        preEndRestTitle: "Break wrapping up",
+        preEndRestBody: "{min} min of break left.",
+      },
+      preEnd: {
+        workBanner: "{min} min of focus left",
+        restBanner: "{min} min of break left",
+        dismiss: "Dismiss",
+      },
+      pip: {
+        open: "Floating window",
+        openAria: "Open floating timer window",
+        close: "Close floating window",
+        pause: "Pause",
+        start: "Start",
+        skip: "Skip",
+        focusLabel: "Focus",
+        restLabel: "Break",
       },
     },
     exercises: {
@@ -555,6 +578,17 @@ export const en = {
       sounds: {
         on: "On",
         off: "Off",
+      },
+      volume: "Volume",
+      volumeHint: "Louder, more audible endings and warnings.",
+      testSound: "Test sound",
+      warnBefore: "Warn before the end",
+      warnBeforeHint: "Soft cue a few minutes before each phase ends.",
+      warnBeforeOptions: {
+        off: "Off",
+        oneMin: "1 min",
+        twoMin: "2 min",
+        fiveMin: "5 min",
       },
       darkMode: "Dark mode",
       language: "Language",
