@@ -10,7 +10,10 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
-*.local
+
+# Environment: commit .env (anon key is public), keep local overrides out
+.env.local
+.env.*.local
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +25,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code (local, personal)
+.claude/settings.local.json
+
+# Playwright
+test-results
+playwright-report
+blob-report
+.playwright
+
+# Prerender artifacts
+prerendered.json
