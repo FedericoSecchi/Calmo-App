@@ -72,8 +72,10 @@ try {
   for (const route of routes) {
     const url = `${serverUrl}${route.path}`;
     try {
-      await page.goto(url, { waitUntil: "networkidle", timeout: 20000 });
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
       await page.waitForSelector("h1", { timeout: 15000 });
+      // Give React one more tick so usePageSEO can set canonical/hreflang.
+      await page.waitForTimeout(400);
       const html = await page.content();
       const outPath = route.path === "/" ? "/index.html" : `${route.path}index.html`;
       const absolutePath = join(DIST, outPath.startsWith("/") ? outPath.slice(1) : outPath);
