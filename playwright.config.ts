@@ -4,7 +4,10 @@ const PORT = 4173;
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  timeout: 60_000,
+  // 90s per test; the overall budget includes context teardown, which can
+  // take tens of seconds when the Supabase client leaves background refresh
+  // timers / broadcast channels open after a run against production.
+  timeout: 90_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
   retries: 2,
