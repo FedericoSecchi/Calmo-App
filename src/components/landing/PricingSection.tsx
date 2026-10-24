@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,27 +35,15 @@ export const PricingSection = () => {
   return (
     <section id="pricing" className="py-24">
       <div className="container mx-auto px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
-        >
+        <div className="text-center mb-16">
           <h2 className="font-heading text-3xl md:text-4xl text-foreground">
             {t.pricing.title} <span className="text-primary">{t.pricing.titleHighlight}</span>
           </h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">{t.pricing.subtitle}</p>
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="relative bg-card rounded-2xl p-8 border border-border/50 shadow-soft"
-          >
+          <div className="relative bg-card rounded-2xl p-8 border border-border/50 shadow-soft">
             <div className="text-center mb-6">
               <h3 className="font-heading text-xl text-foreground mb-2">{t.pricing.free.name}</h3>
               <div className="flex items-baseline justify-center gap-1">
@@ -78,15 +65,9 @@ export const PricingSection = () => {
             <Button variant="outline" size="lg" className="w-full" asChild>
               <Link to="/auth?mode=signup">{t.pricing.free.cta}</Link>
             </Button>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="relative bg-card rounded-2xl p-8 border border-primary shadow-glow"
-          >
+          <div className="relative bg-card rounded-2xl p-8 border border-primary shadow-glow">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">
                 <Sparkles className="h-3 w-3" />
@@ -144,7 +125,7 @@ export const PricingSection = () => {
                 </p>
               )}
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>

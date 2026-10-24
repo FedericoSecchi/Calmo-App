@@ -14,7 +14,7 @@ export const es: Dict = {
     howItWorks: "Cómo funciona",
     pricing: "Precios",
     signIn: "Entrar",
-    getStarted: "Empezar",
+    getStarted: "Crear cuenta",
     openApp: "Abrir app",
   },
   hero: {

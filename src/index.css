@@ -180,7 +180,29 @@
   .shadow-glow {
     box-shadow: var(--shadow-glow);
   }
-  
+
+  /* Landing hero background: pure CSS radial gradients that paint with the
+     first frame instead of waiting on JS/framer-motion. The soft pulse is a
+     once-per-20s loop; reduced-motion zeroes it out further down. */
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+    background:
+      radial-gradient(circle at 85% 20%, hsla(28, 52%, 55%, 0.18), transparent 55%),
+      radial-gradient(circle at 15% 30%, hsla(59, 21%, 34%, 0.14), transparent 55%),
+      radial-gradient(circle at 70% 80%, hsla(157, 45%, 34%, 0.12), transparent 55%),
+      radial-gradient(circle at 25% 85%, hsla(28, 52%, 55%, 0.14), transparent 55%);
+    opacity: 0.75;
+    animation: hero-bg-pulse 20s ease-in-out infinite;
+  }
+  @keyframes hero-bg-pulse {
+    0%, 100% { opacity: 0.65; }
+    50% { opacity: 0.9; }
+  }
+
   /* Ambient animation for hero */
   @keyframes float {
     0%, 100% {

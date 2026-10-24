@@ -54,6 +54,31 @@ fi
 
 run "e2e (Playwright)" npx playwright test --reporter=line
 
+# Lighthouse mobile on the landing pages. The script boots its own Playwright
+# chromium so we don't double-start a browser; we just need vite preview up.
+echo "---"
+echo "[verify] lighthouse (mobile) on / and /es/"
+PREVIEW_PID=""
+if ! lsof -i :4173 >/dev/null 2>&1; then
+  npx vite preview --port 4173 --strictPort >/tmp/calmo-verify-preview.log 2>&1 &
+  PREVIEW_PID=$!
+  # Give preview a moment to come up.
+  for _ in $(seq 1 20); do
+    if curl -sf http://localhost:4173/ -o /dev/null; then break; fi
+    sleep 0.3
+  done
+fi
+if LH_MIN_PERF=95 LH_MIN_A11Y=100 LH_MIN_SEO=95 LH_MIN_BP=95 \
+    node scripts/lighthouse-mobile.mjs http://localhost:4173/ http://localhost:4173/es/; then
+  RESULTS+=("PASS  lighthouse (mobile) on / and /es/")
+else
+  RESULTS+=("FAIL  lighthouse (mobile) on / and /es/")
+  STATUS=1
+fi
+if [ -n "$PREVIEW_PID" ]; then
+  kill "$PREVIEW_PID" >/dev/null 2>&1 || true
+fi
+
 echo
 echo "========= VERIFY SUMMARY ========="
 for line in "${RESULTS[@]}"; do

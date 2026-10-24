@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
 import { Menu, X, Globe } from "lucide-react";
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { useT } from "@/lib/i18n";
 import { HOME_PATHS } from "@/lib/i18n/types";
 
@@ -20,7 +19,7 @@ export const Navbar = () => {
     return HOME_PATHS[other];
   })();
 
-  const authPath = lang === "es" ? "/auth" : "/auth";
+  const authPath = "/auth";
   const home = HOME_PATHS[lang];
 
   return (
@@ -62,48 +61,42 @@ export const Navbar = () => {
             onClick={() => setIsOpen(!isOpen)}
             className="md:hidden p-2 rounded-lg hover:bg-muted transition-colors"
             aria-label="menu"
+            aria-expanded={isOpen}
           >
             {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </div>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-background border-b border-border"
-          >
-            <div className="container mx-auto px-4 py-4 flex flex-col gap-4">
-              <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2" onClick={() => setIsOpen(false)}>
-                {t.nav.features}
-              </a>
-              <a href="#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2" onClick={() => setIsOpen(false)}>
-                {t.nav.howItWorks}
-              </a>
-              <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2" onClick={() => setIsOpen(false)}>
-                {t.nav.pricing}
-              </a>
-              <div className="flex flex-col gap-2 pt-4 border-t border-border">
-                <Button variant="ghost" asChild className="w-full">
-                  <Link to={switchHref}>
-                    <Globe className="h-4 w-4" />
-                    {t.meta.switchLanguage}
-                  </Link>
-                </Button>
-                <Button variant="outline" asChild className="w-full">
-                  <Link to={authPath}>{t.nav.signIn}</Link>
-                </Button>
-                <Button asChild className="w-full">
-                  <Link to={`${authPath}?mode=signup`}>{t.nav.getStarted}</Link>
-                </Button>
-              </div>
+      {isOpen && (
+        <div className="md:hidden bg-background border-b border-border">
+          <div className="container mx-auto px-4 py-4 flex flex-col gap-4">
+            <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2" onClick={() => setIsOpen(false)}>
+              {t.nav.features}
+            </a>
+            <a href="#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2" onClick={() => setIsOpen(false)}>
+              {t.nav.howItWorks}
+            </a>
+            <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2" onClick={() => setIsOpen(false)}>
+              {t.nav.pricing}
+            </a>
+            <div className="flex flex-col gap-2 pt-4 border-t border-border">
+              <Button variant="ghost" asChild className="w-full">
+                <Link to={switchHref}>
+                  <Globe className="h-4 w-4" />
+                  {t.meta.switchLanguage}
+                </Link>
+              </Button>
+              <Button variant="outline" asChild className="w-full">
+                <Link to={authPath}>{t.nav.signIn}</Link>
+              </Button>
+              <Button asChild className="w-full">
+                <Link to={`${authPath}?mode=signup`}>{t.nav.getStarted}</Link>
+              </Button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

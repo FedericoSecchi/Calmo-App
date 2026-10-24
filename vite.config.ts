@@ -11,20 +11,20 @@ export default defineConfig({
   build: {
     outDir: "dist",
     assetsDir: "assets",
+    // Only preload modules the main entry statically imports. Dynamic chunks
+    // (supabase, framer-motion, recharts) load on demand without eating the
+    // landing page's initial fetch budget.
+    modulePreload: {
+      polyfill: false,
+      resolveDependencies: (_url, deps, { hostType }) => {
+        if (hostType !== "html") return deps;
+        return deps.filter((d) => /\/(vendor-react|index-)/.test(d));
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks: {
           "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-ui": [
-            "framer-motion",
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-tooltip",
-          ],
-          "vendor-charts": ["recharts"],
-          "vendor-supabase": ["@supabase/supabase-js"],
-          "vendor-query": ["@tanstack/react-query"],
         },
       },
     },

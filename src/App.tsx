@@ -1,17 +1,10 @@
 import { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation, useNavigate, useSearchParams, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate, useSearchParams, Navigate, Outlet } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { FocusTimerProvider } from "./contexts/FocusTimerContext";
-import { PWAProvider } from "@/components/PWAProvider";
 import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Onboarding from "./pages/Onboarding";
-import AppLayout from "./layouts/AppLayout";
 import NotFound from "./pages/NotFound";
 import { HOME_PATHS, SEO_PATHS, LEGAL_PATHS } from "@/lib/i18n/types";
 import { SEO_META } from "@/lib/i18n/routes";
@@ -19,11 +12,14 @@ import { usePageSEO } from "@/hooks/usePageSEO";
 import { useT } from "@/lib/i18n";
 import { trackPageView } from "@/lib/analytics";
 
-const Dashboard = lazy(() => import("./pages/app/Dashboard"));
-const Reminders = lazy(() => import("./pages/app/Reminders"));
-const Exercises = lazy(() => import("./pages/app/Exercises"));
-const Pain = lazy(() => import("./pages/app/Pain"));
-const Settings = lazy(() => import("./pages/app/Settings"));
+// Auth-aware routes live under a lazy shell so the public landing / SEO /
+// legal pages never pull supabase, framer-motion-heavy providers, or the app
+// code into the initial bundle.
+const AuthShell = lazy(() => import("./layouts/AuthShell"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const AppRoutes = lazy(() => import("./layouts/AppRoutes"));
+
 const SeoPage = lazy(() => import("./pages/seo/SeoPage"));
 const Privacy = lazy(() => import("./pages/legal/Privacy"));
 const Terms = lazy(() => import("./pages/legal/Terms"));
@@ -50,21 +46,6 @@ const RedirectHandler = () => {
   return null;
 };
 
-const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
-  const { user, loading, isGuest } = useAuth();
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-muted-foreground">Loading…</div>
-      </div>
-    );
-  }
-  if (!user && !isGuest) {
-    return <Navigate to="/auth" replace />;
-  }
-  return children;
-};
-
 const HomePage = ({ lang }: { lang: "en" | "es" }) => {
   const { t } = useT();
   const path = HOME_PATHS[lang];
@@ -88,75 +69,62 @@ const TrailingSlash = () => {
 
 const SEO_KEYS = Object.keys(SEO_PATHS) as Array<keyof typeof SEO_PATHS>;
 
+const AuthShellRoute = () => (
+  <Suspense fallback={<PageFallback />}>
+    <AuthShell />
+  </Suspense>
+);
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <Sonner />
-          <PWAProvider>
-            <BrowserRouter>
-              <RedirectHandler />
-              <TrailingSlash />
-              <Routes>
-                <Route path="/" element={<HomePage lang="en" />} />
-                <Route path="/es" element={<Navigate to="/es/" replace />} />
-                <Route path="/es/" element={<HomePage lang="es" />} />
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <RedirectHandler />
+        <TrailingSlash />
+        <Routes>
+          <Route path="/" element={<HomePage lang="en" />} />
+          <Route path="/es" element={<Navigate to="/es/" replace />} />
+          <Route path="/es/" element={<HomePage lang="es" />} />
 
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/onboarding" element={<Onboarding />} />
+          {SEO_KEYS.map((key) => (
+            <Route
+              key={`${key}-en`}
+              path={SEO_PATHS[key].en}
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <SeoPage pageKey={key} lang="en" title={SEO_META[key].en.title} description={SEO_META[key].en.description} />
+                </Suspense>
+              }
+            />
+          ))}
+          {SEO_KEYS.map((key) => (
+            <Route
+              key={`${key}-es`}
+              path={SEO_PATHS[key].es}
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <SeoPage pageKey={key} lang="es" title={SEO_META[key].es.title} description={SEO_META[key].es.description} />
+                </Suspense>
+              }
+            />
+          ))}
 
-                {SEO_KEYS.map((key) => (
-                  <Route
-                    key={`${key}-en`}
-                    path={SEO_PATHS[key].en}
-                    element={
-                      <Suspense fallback={<PageFallback />}>
-                        <SeoPage pageKey={key} lang="en" title={SEO_META[key].en.title} description={SEO_META[key].en.description} />
-                      </Suspense>
-                    }
-                  />
-                ))}
-                {SEO_KEYS.map((key) => (
-                  <Route
-                    key={`${key}-es`}
-                    path={SEO_PATHS[key].es}
-                    element={
-                      <Suspense fallback={<PageFallback />}>
-                        <SeoPage pageKey={key} lang="es" title={SEO_META[key].es.title} description={SEO_META[key].es.description} />
-                      </Suspense>
-                    }
-                  />
-                ))}
+          <Route path={LEGAL_PATHS.privacy.en} element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
+          <Route path={LEGAL_PATHS.privacy.es} element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
+          <Route path={LEGAL_PATHS.terms.en} element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
+          <Route path={LEGAL_PATHS.terms.es} element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
 
-                <Route path={LEGAL_PATHS.privacy.en} element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
-                <Route path={LEGAL_PATHS.privacy.es} element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
-                <Route path={LEGAL_PATHS.terms.en} element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
-                <Route path={LEGAL_PATHS.terms.es} element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
+          <Route element={<AuthShellRoute />}>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/app/*" element={<AppRoutes />} />
+          </Route>
 
-                <Route
-                  path="/app"
-                  element={
-                    <ProtectedRoute>
-                      <FocusTimerProvider>
-                        <AppLayout />
-                      </FocusTimerProvider>
-                    </ProtectedRoute>
-                  }
-                >
-                  <Route index element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
-                  <Route path="reminders" element={<Suspense fallback={<PageFallback />}><Reminders /></Suspense>} />
-                  <Route path="exercises" element={<Suspense fallback={<PageFallback />}><Exercises /></Suspense>} />
-                  <Route path="pain" element={<Suspense fallback={<PageFallback />}><Pain /></Suspense>} />
-                  <Route path="settings" element={<Suspense fallback={<PageFallback />}><Settings /></Suspense>} />
-                </Route>
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </PWAProvider>
-        </AuthProvider>
-      </TooltipProvider>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
     </QueryClientProvider>
   </ErrorBoundary>
 );
