@@ -64,6 +64,7 @@ Known codes (2026-10-25):
 - `18774c17` (manual script run)
 - `686449b7` (remote e2e against prod, Stage 2 verify)
 - `f7692a14` (local verify, Stage 3)
+- `9ff5735f` (remote e2e against prod, Stage 3 verify)
 
 ## Garden (Stage 3)
 
