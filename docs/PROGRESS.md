@@ -107,7 +107,11 @@ Visual-review fixes across the whole stack. Highlights:
 
 ### Rooms-as-state room codes (2026-10-25)
 
-- (fill in after remote verify)
+- `3cf62437` — local verify, invitee strip reconnect test
+- `2764ac62` — remote e2e vs prod, central-button test
+- `75f35162` — remote e2e vs prod, invitee rename/leave test
+- `ba8c93a9` — remote e2e vs prod, existing room sync test
+- All cascade-delete with the e2e account; `get_focus_room_meta` returns `[]` after cleanup.
 
 ## Pending / manual review
 
