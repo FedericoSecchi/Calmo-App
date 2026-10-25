@@ -32,6 +32,25 @@ run "prerender" node scripts/prerender.mjs
 run "og-images" node scripts/generate-og-images.mjs
 run "verify-dist" node scripts/verify-dist.mjs
 
+check_join_preview() {
+  local path="$1"
+  if ! [ -f "$ROOT/dist/${path#/}index.html" ]; then
+    echo "[verify] missing dist/${path#/}index.html"
+    return 1
+  fi
+  if ! grep -q 'property="og:title"' "$ROOT/dist/${path#/}index.html"; then
+    echo "[verify] ${path}: no og:title"
+    return 1
+  fi
+  if ! grep -qi 'name="robots"[^>]*noindex' "$ROOT/dist/${path#/}index.html"; then
+    echo "[verify] ${path}: missing noindex"
+    return 1
+  fi
+}
+
+run "join preview (en)" check_join_preview "/join/"
+run "join preview (es)" check_join_preview "/es/unirse/"
+
 echo "---"
 echo "[verify] grep for forbidden strings in src/ and dist/"
 BAD_SRC=$(grep -RIn "calm-desk-companion\|signInWithOAuth\|fonts.googleapis\|lovable\|t\.me/\|Spotify\|open\.spotify\|pain_records\|console\\.log" src/ 2>/dev/null | grep -vE "test\.ts|spec\.ts|CLAUDE\\.md|scripts/" | grep -vE "^$" || true)

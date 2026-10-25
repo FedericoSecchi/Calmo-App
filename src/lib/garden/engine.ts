@@ -59,15 +59,19 @@ export interface SkyScene {
   stars: Star[];
   tintStrength: number;
   constellation: Constellation | null;
+  /** 0=deep night (lots of activity), 1=sunset (empty state). */
+  sunsetness: number;
 }
 
 export interface CompanionScene {
   // 0 = tense/at desk, 1..4 = progressively more relaxed (break-driven).
   relaxLevel: number;
-  // 0 = none, 1..5 plant growth stages (water-driven).
+  // 0..5 plant growth stages (water-driven). 1 is a visible sapling (baseline).
   plantLevel: number;
   // Stretch arm length (exercise-driven), 0..1.
   stretchAmount: number;
+  // When true the scene uses a larger-pot/plant layout (weekly view).
+  weeklyBoost: boolean;
 }
 
 export interface Scene {
@@ -77,6 +81,8 @@ export interface Scene {
   sky?: SkyScene;
   companion?: CompanionScene;
   altText: string;
+  /** True when the counts have no activity to render (special baseline scene). */
+  isEmpty: boolean;
 }
 
 // --- Deterministic PRNG ---
@@ -111,68 +117,113 @@ function seededRng(seed: string, salt: string): () => number {
 
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
-// --- Alt text ---
-
-function describeCounts(counts: GardenCounts, theme: GardenTheme): string {
-  const items: string[] = [];
-  if (counts.break > 0) items.push(`${counts.break} breaks`);
-  if (counts.exercise > 0) items.push(`${counts.exercise} exercises`);
-  if (counts.water > 0) items.push(`${counts.water} glasses of water`);
-  if (counts.focus > 0) items.push(`${counts.focus} focus completed`);
-  const summary = items.length === 0 ? "nothing logged yet" : items.join(", ");
-  return `Your ${theme} garden today: ${summary}.`;
+export function hasAnyActivity(counts: GardenCounts): boolean {
+  return counts.break > 0 || counts.exercise > 0 || counts.water > 0 || counts.focus > 0;
 }
 
 // --- Zen ---
+//
+// A zen garden reads as sand with parallel rake lines, stones with concentric
+// rings carved into the sand around them, and a bit of moss hugging the base
+// of each stone. Breaks add rake rows; exercises add stones; focus completed
+// cycles deepen the rings; water drops add moss.
+
+function hashString(s: string): number {
+  return xmur3(s)();
+}
 
 function buildZen(counts: GardenCounts, seed: string, size: number): ZenScene {
   const rng = seededRng(seed, "zen");
   const pad = size * 0.08;
   const inner = size - pad * 2;
+  const isEmpty = !hasAnyActivity(counts);
 
+  // Empty state: a single hero stone centered, with its surrounding ring
+  // and a few base rake lines. This signals "zen garden, awaiting your first
+  // pause".
+  const heroStone: Stone | null = isEmpty
+    ? {
+        cx: pad + inner * 0.5,
+        cy: pad + inner * 0.55,
+        r: size * 0.075,
+        rotation: 12,
+      }
+    : null;
+
+  // Stones from exercise completions. The hero stone (if present) is kept.
   const stones: Stone[] = [];
-  const stoneCount = clamp(counts.exercise, 0, 10);
+  if (heroStone) stones.push(heroStone);
+  const stoneCount = clamp(counts.exercise, 0, 8);
   for (let i = 0; i < stoneCount; i++) {
+    // Avoid stacking stones: distribute roughly across a jittered grid.
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const gx = pad + inner * (0.2 + col * 0.3) + (rng() - 0.5) * inner * 0.08;
+    const gy = pad + inner * (0.25 + row * 0.25) + (rng() - 0.5) * inner * 0.08;
     stones.push({
-      cx: pad + rng() * inner,
-      cy: pad + rng() * inner,
-      r: size * (0.04 + rng() * 0.03),
+      cx: gx,
+      cy: gy,
+      r: size * (0.04 + rng() * 0.025),
       rotation: rng() * 360,
     });
   }
 
+  // Straight parallel rake lines. The sand always has at least a few base
+  // rows so it reads as "freshly raked"; each break adds another row on top,
+  // capped at a tidy maximum so the garden never looks overcrowded.
+  const furrowRows = clamp(4 + counts.break, 4, 12);
   const furrows: Furrow[] = [];
-  const furrowCount = clamp(counts.break, 0, 20);
-  for (let i = 0; i < furrowCount; i++) {
-    const y = pad + ((i + 0.5) / Math.max(furrowCount, 1)) * inner;
-    const amp = size * (0.012 + rng() * 0.015);
+  for (let i = 0; i < furrowRows; i++) {
+    const y = pad + ((i + 0.5) / Math.max(furrowRows, 1)) * inner;
+    // Straight horizontal line that dodges around stones (small bend when it
+    // passes near one, kept small so the overall look stays parallel).
+    const steps = 24;
     const points: string[] = [];
-    const steps = 10;
     for (let s = 0; s <= steps; s++) {
       const x = pad + (s / steps) * inner;
-      const yy = y + Math.sin(s * 1.1 + rng() * 2) * amp;
+      let yy = y;
+      for (const stone of stones) {
+        const dx = x - stone.cx;
+        const dy = y - stone.cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const influence = stone.r * 2.6;
+        if (dist < influence) {
+          const bend = (influence - dist) * 0.5;
+          yy += dy >= 0 ? bend : -bend;
+        }
+      }
       points.push(`${s === 0 ? "M" : "L"} ${x.toFixed(2)} ${yy.toFixed(2)}`);
     }
     furrows.push({ path: points.join(" ") });
   }
 
+  // Moss hugs the base of each stone — a small cluster beside each one. Each
+  // drink of water adds one more fleck in the cluster, up to a cap.
   const mossDots: MossDot[] = [];
-  const mossCount = clamp(counts.water * 4, 0, 48);
-  for (let i = 0; i < mossCount; i++) {
-    mossDots.push({
-      cx: pad + rng() * inner,
-      cy: pad + rng() * inner,
-      r: size * 0.005 + rng() * size * 0.004,
-    });
-  }
+  const mossPerStone = clamp(counts.water, 0, 6);
+  stones.forEach((stone, idx) => {
+    const base = Math.max(2, mossPerStone);
+    for (let i = 0; i < base; i++) {
+      const angle = (hashString(seed + idx + i) % 360) * (Math.PI / 180) + 0.7 * Math.PI;
+      const radial = stone.r * (0.9 + ((hashString(seed + idx + i + "r") % 100) / 100) * 0.4);
+      mossDots.push({
+        cx: stone.cx + Math.cos(angle) * radial,
+        cy: stone.cy + Math.sin(angle) * radial * 0.6,
+        r: size * (0.006 + ((hashString(seed + idx + i + "s") % 100) / 100) * 0.003),
+      });
+    }
+  });
 
+  // Concentric rings around stones: 1 base ring per stone (empty state hero
+  // included) plus one extra ring per focus completed, up to a cap per stone.
   const rakeRings: Array<{ cx: number; cy: number; r: number }> = [];
-  const ringsPerStone = clamp(counts.focus, 0, stones.length);
-  for (let i = 0; i < ringsPerStone; i++) {
-    const stone = stones[i];
-    if (!stone) break;
-    rakeRings.push({ cx: stone.cx, cy: stone.cy, r: stone.r * (1.9 + rng() * 0.6) });
-  }
+  const extraRings = clamp(counts.focus, 0, 3);
+  stones.forEach((stone) => {
+    const total = 1 + extraRings;
+    for (let r = 1; r <= total; r++) {
+      rakeRings.push({ cx: stone.cx, cy: stone.cy, r: stone.r * (1.6 + r * 0.55) });
+    }
+  });
 
   return { stones, furrows, mossDots, rakeRings };
 }
@@ -183,8 +234,20 @@ function buildSky(counts: GardenCounts, seed: string, size: number, weekly: bool
   const rng = seededRng(seed, "sky");
   const pad = size * 0.05;
   const inner = size - pad * 2;
+  const isEmpty = !hasAnyActivity(counts);
 
   const stars: Star[] = [];
+  // Empty-state scene: a sunset sky with a single faint "first star" waiting
+  // to be lit. Any activity dims the sunset and adds real stars.
+  if (isEmpty) {
+    stars.push({
+      cx: pad + inner * 0.72,
+      cy: pad + inner * 0.3,
+      r: size * 0.014,
+      bright: true,
+    });
+  }
+
   const dimCount = clamp(counts.break * 3, 0, 60);
   for (let i = 0; i < dimCount; i++) {
     stars.push({
@@ -205,6 +268,10 @@ function buildSky(counts: GardenCounts, seed: string, size: number, weekly: bool
   }
 
   const tintStrength = clamp(counts.water / 10, 0, 1);
+  // Sunset fades as activity accumulates. 1 (full sunset) when empty; drops
+  // quickly with any activity.
+  const activityTotal = counts.break + counts.exercise + counts.water + counts.focus;
+  const sunsetness = isEmpty ? 1 : clamp(1 - activityTotal / 4, 0, 0.4);
 
   let constellation: Constellation | null = null;
   if (weekly && counts.focus >= 3 && stars.length >= 4) {
@@ -215,26 +282,34 @@ function buildSky(counts: GardenCounts, seed: string, size: number, weekly: bool
     };
   }
 
-  return { stars, tintStrength, constellation };
+  return { stars, tintStrength, constellation, sunsetness };
 }
 
 // --- Companion ---
 
-function buildCompanion(counts: GardenCounts): CompanionScene {
+function buildCompanion(counts: GardenCounts, weekly: boolean): CompanionScene {
   const relaxLevel = clamp(Math.floor((counts.break + Math.floor(counts.exercise / 2)) / 1), 0, 4);
-  const plantLevel = clamp(counts.water, 0, 5);
+  // Baseline (empty state): plant visible as a sapling so the scene reads as
+  // "someone sitting at their desk with a plant" from day zero.
+  const plantLevel = clamp(1 + counts.water, 1, 5);
   const stretchAmount = clamp(counts.exercise / 6, 0, 1);
-  return { relaxLevel, plantLevel, stretchAmount };
+  return { relaxLevel, plantLevel, stretchAmount, weeklyBoost: weekly };
 }
 
 export function renderScene(input: SceneInput): Scene {
   const { theme, counts, seed, size, weekly = false } = input;
-  const altText = describeCounts(counts, theme);
+  const isEmpty = !hasAnyActivity(counts);
+  // Alt text is overridden by the component (which has i18n context). The
+  // engine returns the English fallback so the renderScene() return remains
+  // self-describing when used from tests or non-React code.
+  const altText = isEmpty
+    ? `Your ${theme} garden today: nothing logged yet.`
+    : `Your ${theme} garden today.`;
   if (theme === "zen") {
-    return { theme, size, zen: buildZen(counts, seed, size), altText };
+    return { theme, size, zen: buildZen(counts, seed, size), altText, isEmpty };
   }
   if (theme === "sky") {
-    return { theme, size, sky: buildSky(counts, seed, size, weekly), altText };
+    return { theme, size, sky: buildSky(counts, seed, size, weekly), altText, isEmpty };
   }
-  return { theme, size, companion: buildCompanion(counts), altText };
+  return { theme, size, companion: buildCompanion(counts, weekly), altText, isEmpty };
 }

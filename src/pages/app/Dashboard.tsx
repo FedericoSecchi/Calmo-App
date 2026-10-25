@@ -9,7 +9,6 @@ import {
   Minus,
   Loader2,
   Pause,
-  Brain,
   SkipForward,
   TrendingUp,
   PictureInPicture2,
@@ -853,49 +852,41 @@ const Dashboard = () => {
           <Button
             variant="outline"
             size="lg"
-            className="justify-start h-auto py-3"
+            className="justify-start h-auto py-3 whitespace-normal"
             onClick={handleCreateRoomClick}
             disabled={isCreatingRoom}
           >
             {isCreatingRoom ? (
-              <Loader2 className="h-5 w-5 mr-3 text-primary animate-spin" />
+              <Loader2 className="h-5 w-5 mr-3 text-primary animate-spin shrink-0" />
             ) : (
-              <UsersIcon className="h-5 w-5 mr-3 text-primary" />
+              <UsersIcon className="h-5 w-5 mr-3 text-primary shrink-0" />
             )}
-            <div className="text-left">
+            <div className="text-left min-w-0 flex-1">
               <p className="font-medium text-sm">{roomT.shareTitle}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground whitespace-normal break-words">
                 {isGuest ? roomT.createNeedsAccount : roomT.shareDesc}
               </p>
             </div>
           </Button>
 
-          <Button variant="outline" size="lg" className="justify-start h-auto py-3" asChild>
+          <Button variant="outline" size="lg" className="justify-start h-auto py-3 whitespace-normal" asChild>
             <Link to="/app/pain">
-              <Activity className="h-5 w-5 mr-3 text-primary" />
-              <div className="text-left">
+              <Activity className="h-5 w-5 mr-3 text-primary shrink-0" />
+              <div className="text-left min-w-0 flex-1">
                 <p className="font-medium text-sm">{d.logFeelingTitle}</p>
-                <p className="text-xs text-muted-foreground">{d.logFeelingDesc}</p>
+                <p className="text-xs text-muted-foreground whitespace-normal break-words">{d.logFeelingDesc}</p>
               </div>
             </Link>
           </Button>
 
-          <Button variant="outline" size="lg" className="justify-start h-auto py-3" asChild>
+          <Button variant="outline" size="lg" className="justify-start h-auto py-3 whitespace-normal" asChild>
             <Link to="/app/exercises">
-              <Play className="h-5 w-5 mr-3 text-primary" />
-              <div className="text-left">
+              <Play className="h-5 w-5 mr-3 text-primary shrink-0" />
+              <div className="text-left min-w-0 flex-1">
                 <p className="font-medium text-sm">{d.quickExerciseTitle}</p>
-                <p className="text-xs text-muted-foreground">{d.quickExerciseDesc}</p>
+                <p className="text-xs text-muted-foreground whitespace-normal break-words">{d.quickExerciseDesc}</p>
               </div>
             </Link>
-          </Button>
-
-          <Button variant="outline" size="lg" className="justify-start h-auto py-3 opacity-50 cursor-not-allowed" disabled>
-            <Brain className="h-5 w-5 mr-3" />
-            <div className="text-left">
-              <p className="font-medium text-sm">{d.meditationTitle}</p>
-              <p className="text-xs text-muted-foreground">{d.comingSoon}</p>
-            </div>
           </Button>
         </div>
       </motion.section>

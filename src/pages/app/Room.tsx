@@ -15,10 +15,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useFocusRoom } from "@/hooks/useFocusRoom";
+import { useFocusRoom, ROOM_RHYTHMS, type RoomRhythmId } from "@/hooks/useFocusRoom";
 import { useT, format } from "@/lib/i18n";
 import { track } from "@/lib/analytics";
 import { GardenCard } from "@/components/garden/GardenCard";
+import type { GardenTheme } from "@/lib/garden/engine";
+import { useFocusTimer, type PresetId } from "@/contexts/FocusTimerContext";
+import { JOIN_PATHS } from "@/lib/i18n/types";
 
 const ROOM_NAME_KEY = "calmo_room_name";
 
@@ -92,9 +95,10 @@ interface RoomViewProps {
 }
 
 const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
-  const { t } = useT();
+  const { t, lang } = useT();
   const r = t.app.room;
   const { toast } = useToast();
+  const { selectedPreset } = useFocusTimer();
 
   const {
     status,
@@ -106,8 +110,9 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
     pause,
     resume,
     skip,
+    setRhythm,
     logActivity,
-  } = useFocusRoom(code, name);
+  } = useFocusRoom(code, name, { initialRhythmId: selectedPreset as PresetId });
 
   const trackedJoinRef = useRef(false);
   useEffect(() => {
@@ -118,8 +123,9 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
 
   const shareUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
-    return `${window.location.origin}/app/room/${code}`;
-  }, [code]);
+    const joinPath = JOIN_PATHS[lang];
+    return `${window.location.origin}${joinPath}?c=${encodeURIComponent(code)}`;
+  }, [code, lang]);
 
   const handleCopyLink = async () => {
     if (!shareUrl) return;
@@ -245,6 +251,35 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
             {r.skip}
           </Button>
         </div>
+
+        <div className="mt-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            {r.rhythmLabel}
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {(Object.values(ROOM_RHYTHMS)).map((rhythm) => {
+              const isActive = state.rhythmId === rhythm.id;
+              return (
+                <button
+                  key={rhythm.id}
+                  type="button"
+                  onClick={() => setRhythm(rhythm.id as RoomRhythmId)}
+                  disabled={isRunning}
+                  className={`p-2 rounded-xl border-2 text-xs font-medium transition-all ${
+                    isActive
+                      ? "border-primary bg-primary/5 text-foreground"
+                      : "border-border text-muted-foreground hover:border-border/80"
+                  } ${isRunning ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  {t.app.presets[rhythm.id as PresetId].name}
+                </button>
+              );
+            })}
+          </div>
+          {isRunning && (
+            <p className="mt-2 text-xs text-muted-foreground">{r.rhythmChangeHint}</p>
+          )}
+        </div>
       </motion.div>
 
       <div className="mb-5 grid grid-cols-2 gap-2">
@@ -286,7 +321,7 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
                 className={`text-sm ${p.key === myKey ? "font-medium text-foreground" : "text-muted-foreground"}`}
               >
                 {p.name}
-                {p.key === myKey ? " · you" : ""}
+                {p.key === myKey ? ` · ${r.youSuffix}` : ""}
               </li>
             ))}
           </ul>
@@ -300,7 +335,7 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
         className="space-y-3"
       >
         <GardenCard
-          theme={info?.gardenTheme ?? "zen"}
+          theme={(info?.gardenTheme ?? "zen") as GardenTheme}
           counts={{
             focus: info?.focusCount ?? 0,
             break: info?.breakCount ?? 0,
@@ -308,7 +343,8 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
             water: info?.waterCount ?? 0,
           }}
           seed={`room:${code}`}
-          heading={`${phaseLabel} · ${info?.gardenTheme ?? "zen"}`}
+          heading={t.app.garden.roomTitle}
+          subheading={t.app.garden.themes[(info?.gardenTheme ?? "zen") as GardenTheme]}
           trackSource="room"
         />
         <div className="grid grid-cols-2 gap-2">

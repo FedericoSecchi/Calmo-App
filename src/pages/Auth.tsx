@@ -12,12 +12,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { isSupabaseConfigured } from "@/lib/supabaseClient";
 import { Footer } from "@/components/Footer";
-import { useT } from "@/lib/i18n";
+import { useT, format } from "@/lib/i18n";
 import { LEGAL_PATHS } from "@/lib/i18n/types";
 import { track } from "@/lib/analytics";
 import { migrateGuestDataToServer } from "@/lib/guestMigration";
 
 type AuthMode = "login" | "signup";
+
+const MIN_PASSWORD_LENGTH = 8;
 
 function mapAuthError(error: AuthError | Error | null, dict: ReturnType<typeof useT>["t"]) {
   if (!error) return dict.auth.errors.unknown;
@@ -25,9 +27,21 @@ function mapAuthError(error: AuthError | Error | null, dict: ReturnType<typeof u
   const lower = message.toLowerCase();
   if (lower.includes("already registered") || lower.includes("user already")) return dict.auth.errors.emailInUse;
   if (lower.includes("invalid login") || lower.includes("invalid credentials")) return dict.auth.errors.invalidCredentials;
-  if (lower.includes("password should be at least") || lower.includes("weak password")) return dict.auth.errors.weakPassword;
-  if (lower.includes("invalid email") || lower.includes("unable to validate email")) return dict.auth.errors.invalidEmail;
-  return dict.auth.errors.unknown;
+  if (
+    lower.includes("password should be at least") ||
+    lower.includes("weak password") ||
+    lower.includes("password is too short")
+  ) {
+    return dict.auth.errors.weakPassword;
+  }
+  if (lower.includes("invalid email") || lower.includes("unable to validate email") || lower.includes("email address is invalid")) {
+    return dict.auth.errors.invalidEmail;
+  }
+  if (lower.includes("too many requests") || lower.includes("rate limit")) {
+    return dict.auth.errors.tooManyRequests;
+  }
+  // Fallback with the underlying reason so the user has a hint.
+  return format(dict.auth.errors.unknownWithReason, { reason: message.slice(0, 160) });
 }
 
 const Auth = () => {
@@ -58,6 +72,12 @@ const Auth = () => {
     e.preventDefault();
     if (!isSupabaseConfigured) {
       toast({ title: t.auth.errors.unknown, variant: "destructive" });
+      return;
+    }
+    if (mode === "signup" && password.length < MIN_PASSWORD_LENGTH) {
+      // Guard client-side so we don't burn a Supabase 422; the server policy
+      // is also 8+, this just gives faster feedback with no network cost.
+      toast({ title: t.auth.errors.weakPassword, variant: "destructive" });
       return;
     }
     setIsLoading(true);
@@ -154,7 +174,7 @@ const Auth = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10 pr-10"
                     required
-                    minLength={6}
+                    minLength={mode === "signup" ? MIN_PASSWORD_LENGTH : 1}
                   />
                   <button
                     type="button"
@@ -166,7 +186,24 @@ const Auth = () => {
                   </button>
                 </div>
                 {mode === "signup" && (
-                  <p className="text-xs text-muted-foreground">{t.auth.passwordHint}</p>
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <p
+                      className={
+                        password.length >= MIN_PASSWORD_LENGTH
+                          ? "text-success"
+                          : "text-muted-foreground"
+                      }
+                      data-testid="password-rule"
+                    >
+                      {format(t.auth.passwordMinChars, { n: MIN_PASSWORD_LENGTH })}
+                    </p>
+                    <p className="text-muted-foreground tabular-nums" data-testid="password-counter">
+                      {format(t.auth.passwordCounter, {
+                        current: password.length,
+                        min: MIN_PASSWORD_LENGTH,
+                      })}
+                    </p>
+                  </div>
                 )}
               </div>
 

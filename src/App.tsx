@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, useLocation, useNavigate, useSearchParams
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-import { HOME_PATHS, SEO_PATHS, LEGAL_PATHS } from "@/lib/i18n/types";
+import { HOME_PATHS, SEO_PATHS, LEGAL_PATHS, JOIN_PATHS } from "@/lib/i18n/types";
 import { SEO_META } from "@/lib/i18n/routes";
 import { usePageSEO } from "@/hooks/usePageSEO";
 import { useT } from "@/lib/i18n";
@@ -23,6 +23,7 @@ const AppRoutes = lazy(() => import("./layouts/AppRoutes"));
 const SeoPage = lazy(() => import("./pages/seo/SeoPage"));
 const Privacy = lazy(() => import("./pages/legal/Privacy"));
 const Terms = lazy(() => import("./pages/legal/Terms"));
+const Join = lazy(() => import("./pages/Join"));
 
 const queryClient = new QueryClient();
 
@@ -115,6 +116,9 @@ const App = () => (
           <Route path={LEGAL_PATHS.privacy.es} element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
           <Route path={LEGAL_PATHS.terms.en} element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
           <Route path={LEGAL_PATHS.terms.es} element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
+
+          <Route path={JOIN_PATHS.en} element={<Suspense fallback={<PageFallback />}><Join lang="en" /></Suspense>} />
+          <Route path={JOIN_PATHS.es} element={<Suspense fallback={<PageFallback />}><Join lang="es" /></Suspense>} />
 
           <Route element={<AuthShellRoute />}>
             <Route path="/auth" element={<Auth />} />

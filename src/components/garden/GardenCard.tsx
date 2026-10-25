@@ -5,7 +5,7 @@ import { Garden } from "./Garden";
 import { useT, format } from "@/lib/i18n";
 import { track } from "@/lib/analytics";
 import { useToast } from "@/hooks/use-toast";
-import { renderScene, type GardenCounts, type GardenTheme } from "@/lib/garden/engine";
+import { hasAnyActivity, type GardenCounts, type GardenTheme } from "@/lib/garden/engine";
 
 interface GardenCardProps {
   theme: GardenTheme;
@@ -85,7 +85,19 @@ export const GardenCard = ({
     water: counts.water,
   });
 
-  const altText = renderScene({ theme, counts, seed, size: 300, weekly }).altText;
+  const isEmpty = !hasAnyActivity(counts);
+  const themeName = g.themeNames[theme];
+  const altText = isEmpty
+    ? format(g.altText.empty, { theme: themeName })
+    : (() => {
+        const parts: string[] = [];
+        if (counts.break > 0) parts.push(format(g.altText.parts.break, { n: counts.break }));
+        if (counts.exercise > 0) parts.push(format(g.altText.parts.exercise, { n: counts.exercise }));
+        if (counts.water > 0) parts.push(format(g.altText.parts.water, { n: counts.water }));
+        if (counts.focus > 0) parts.push(format(g.altText.parts.focus, { n: counts.focus }));
+        return format(g.altText.nonEmpty, { theme: themeName, summary: parts.join(", ") });
+      })();
+  const emptyGuide = isEmpty ? g.emptyGuide[theme] : null;
 
   const handleShare = async () => {
     if (!svgRef.current) return;
@@ -150,7 +162,10 @@ export const GardenCard = ({
         <Garden theme={theme} counts={counts} seed={seed} weekly={weekly} svgRef={svgRef} />
       </div>
       <p className="sr-only">{altText}</p>
-      <p className="mt-3 text-xs text-muted-foreground">{summaryText}</p>
+      {emptyGuide && (
+        <p className="mt-3 text-xs text-muted-foreground italic">{emptyGuide}</p>
+      )}
+      <p className="mt-3 text-xs text-muted-foreground break-words">{summaryText}</p>
       {showActions && (
         <div className="mt-3 flex gap-2">
           <Button variant="outline" size="sm" onClick={handleShare}>

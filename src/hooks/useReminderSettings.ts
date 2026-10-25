@@ -23,7 +23,9 @@ export interface UpdateReminderSettings {
   notifications_enabled?: boolean;
 }
 
-// Fetch reminder settings for authenticated user
+// Fetch reminder settings for the authenticated user. Uses maybeSingle so a
+// missing row surfaces as `null` (HTTP 200 with empty body) instead of 406,
+// which was spamming the console right after sign-up.
 const fetchReminderSettings = async (userId: string): Promise<ReminderSettings | null> => {
   if (!isSupabaseConfigured) {
     return null;
@@ -33,20 +35,31 @@ const fetchReminderSettings = async (userId: string): Promise<ReminderSettings |
     .from("reminder_settings")
     .select("*")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
-    // If no settings exist yet, return null (not an error)
-    if (error.code === "PGRST116") {
-      return null;
-    }
     if (import.meta.env.DEV) {
       console.error("Error fetching reminder settings:", error);
     }
     throw error;
   }
 
-  return data;
+  if (data) return data;
+
+  // No row exists yet. Create one with defaults so subsequent reads don't
+  // flap between null and a real row.
+  const { data: created, error: insertError } = await supabase
+    .from("reminder_settings")
+    .insert({ id: userId })
+    .select()
+    .maybeSingle();
+  if (insertError) {
+    if (import.meta.env.DEV) {
+      console.error("Error creating default reminder settings:", insertError);
+    }
+    return null;
+  }
+  return created ?? null;
 };
 
 // Create or update reminder settings

@@ -24,6 +24,26 @@ export const LEGAL = {
   terms: { en: "/terms/", es: "/es/terminos/" },
 };
 
+export const JOIN = {
+  en: "/join/",
+  es: "/es/unirse/",
+};
+
+// Routes that get prerendered + verified but are excluded from the sitemap
+// (they ship with noindex). The /join/ invite-preview page is one of these.
+export function allNoindexRoutes() {
+  const out = [];
+  (["en", "es"]).forEach((lang) => {
+    out.push({
+      path: JOIN[lang],
+      lang,
+      alt: JOIN[lang === "en" ? "es" : "en"],
+      noindex: true,
+    });
+  });
+  return out;
+}
+
 export function allPublicRoutes() {
   const out = [];
   (["en", "es"]).forEach((lang) => {

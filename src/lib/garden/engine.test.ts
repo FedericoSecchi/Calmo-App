@@ -22,11 +22,10 @@ describe("garden engine determinism", () => {
     expect((high.zen?.mossDots.length ?? 0)).toBeGreaterThan(low.zen?.mossDots.length ?? 0);
   });
 
-  it("completed focus adds rake rings around stones", () => {
+  it("completed focus adds extra rake rings around stones", () => {
     const no = renderScene({ theme: "zen", counts: { ...COUNTS, focus: 0 }, seed: "s", size: 300 });
     const some = renderScene({ theme: "zen", counts: COUNTS, seed: "s", size: 300 });
-    expect(no.zen?.rakeRings.length).toBe(0);
-    expect(some.zen?.rakeRings.length).toBeGreaterThan(0);
+    expect(some.zen!.rakeRings.length).toBeGreaterThan(no.zen!.rakeRings.length);
   });
 
   it("sky weekly=true with enough focus unlocks a constellation", () => {
@@ -40,8 +39,9 @@ describe("garden engine determinism", () => {
   it("companion plant grows with water", () => {
     const dry = renderScene({ theme: "companion", counts: { ...COUNTS, water: 0 }, seed: "s", size: 300 });
     const watered = renderScene({ theme: "companion", counts: { ...COUNTS, water: 4 }, seed: "s", size: 300 });
-    expect(dry.companion?.plantLevel).toBe(0);
-    expect(watered.companion?.plantLevel).toBeGreaterThan(0);
+    // Baseline plant is a sapling (>=1) so it's always visible; watering grows it.
+    expect(watered.companion!.plantLevel).toBeGreaterThan(dry.companion!.plantLevel);
+    expect(dry.companion!.plantLevel).toBeGreaterThanOrEqual(1);
   });
 
   it("companion relaxes with more breaks", () => {
@@ -50,11 +50,30 @@ describe("garden engine determinism", () => {
     expect(chill.companion!.relaxLevel).toBeGreaterThan(tense.companion!.relaxLevel);
   });
 
-  it("alt text summarizes the counts in plain English", () => {
-    const scene = renderScene({ theme: "zen", counts: { focus: 1, break: 2, exercise: 1, water: 3 }, seed: "s", size: 300 });
-    expect(scene.altText).toContain("2 breaks");
-    expect(scene.altText).toContain("1 exercises");
-    expect(scene.altText).toContain("3 glasses of water");
+  it("companion weeklyBoost is driven by the weekly flag", () => {
+    const daily = renderScene({ theme: "companion", counts: COUNTS, seed: "s", size: 300 });
+    const weekly = renderScene({ theme: "companion", counts: COUNTS, seed: "s", size: 300, weekly: true });
+    expect(daily.companion!.weeklyBoost).toBe(false);
+    expect(weekly.companion!.weeklyBoost).toBe(true);
+  });
+
+  it("isEmpty flag flips when there is any activity", () => {
+    const empty = renderScene({ theme: "zen", counts: { focus: 0, break: 0, exercise: 0, water: 0 }, seed: "s", size: 300 });
+    const some = renderScene({ theme: "zen", counts: { focus: 0, break: 1, exercise: 0, water: 0 }, seed: "s", size: 300 });
+    expect(empty.isEmpty).toBe(true);
+    expect(some.isEmpty).toBe(false);
+  });
+
+  it("empty zen garden still has one hero stone and baseline rake rows", () => {
+    const empty = renderScene({ theme: "zen", counts: { focus: 0, break: 0, exercise: 0, water: 0 }, seed: "s", size: 300 });
+    expect(empty.zen!.stones.length).toBeGreaterThanOrEqual(1);
+    expect(empty.zen!.furrows.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("empty sky garden shows the first star and full sunsetness", () => {
+    const empty = renderScene({ theme: "sky", counts: { focus: 0, break: 0, exercise: 0, water: 0 }, seed: "s", size: 300 });
+    expect(empty.sky!.stars.length).toBeGreaterThanOrEqual(1);
+    expect(empty.sky!.sunsetness).toBe(1);
   });
 
   it("alt text handles empty gardens gracefully", () => {

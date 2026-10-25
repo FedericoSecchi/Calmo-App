@@ -132,7 +132,7 @@ export const en = {
     subtitleSignUp: "Start taking better care of your body at the keyboard.",
     email: "Email",
     password: "Password",
-    passwordHint: "At least 6 characters.",
+    passwordHint: "At least 8 characters.",
     submitSignIn: "Sign in",
     submitSignUp: "Create account",
     tryGuest: "Try without signing up",
@@ -147,10 +147,14 @@ export const en = {
     errors: {
       emailInUse: "This email is already registered. Try signing in.",
       invalidCredentials: "Email or password is incorrect.",
-      weakPassword: "Password must be at least 6 characters.",
+      weakPassword: "Password must be at least 8 characters.",
       invalidEmail: "That doesn't look like a valid email.",
+      tooManyRequests: "Too many attempts. Please wait a moment and try again.",
       unknown: "Something went wrong. Please try again.",
+      unknownWithReason: "Something went wrong: {reason}. Please try again.",
     },
+    passwordMinChars: "At least {n} characters",
+    passwordCounter: "{current}/{min}",
     toasts: {
       welcomeBack: "Welcome back.",
       accountCreated: "Account created. Welcome!",
@@ -634,6 +638,27 @@ export const en = {
       exportError: "Couldn't export the image. Please try again.",
       shareText: "My Calmo garden today — {counts}. calmo.fit",
       summary: "{breaks} breaks · {exercises} exercises · {water} water",
+      roomTitle: "Room garden",
+      emptyGuide: {
+        zen: "Your first break traces the first furrow.",
+        sky: "Your first break lights the first star.",
+        companion: "Your first break helps them stretch.",
+      },
+      altText: {
+        empty: "Your {theme} garden today: nothing logged yet.",
+        nonEmpty: "Your {theme} garden today: {summary}.",
+        parts: {
+          break: "{n} breaks",
+          exercise: "{n} exercises",
+          water: "{n} glasses of water",
+          focus: "{n} focus completed",
+        },
+      },
+      themeNames: {
+        zen: "zen",
+        sky: "sky",
+        companion: "companion",
+      },
     },
     room: {
       shareTitle: "Focus with friends",
@@ -653,6 +678,7 @@ export const en = {
       shareText: "Join me on Calmo for a focus session: {url}",
       presentsTitle: "Who's here",
       presentsEmpty: "You're the first here. Share the link to invite someone.",
+      youSuffix: "you",
       enterName: "Choose a display name",
       enterNameHint: "Just for this room. Saved on your device.",
       namePlaceholder: "e.g. Alex",
@@ -669,6 +695,8 @@ export const en = {
       pause: "Pause",
       resume: "Resume",
       skip: "Skip",
+      rhythmLabel: "Rhythm",
+      rhythmChangeHint: "Pause the timer to change the rhythm.",
       counters: {
         focus: "Focus completed",
         break: "Breaks",
@@ -701,6 +729,16 @@ export const en = {
         saved: "Saved",
       },
     },
+  },
+  join: {
+    title: "You've been invited to focus together on Calmo",
+    description:
+      "Someone opened a focus room on Calmo and invited you. When you join, the timer stays in sync for everyone.",
+    joining: "Joining the room…",
+    invalid: "This link is no longer valid or is missing the room code.",
+    home: "Back to home",
+    cta: "Join the room",
+    manualHint: "If it doesn't open automatically, tap this button.",
   },
   waitlist: {
     sources: {

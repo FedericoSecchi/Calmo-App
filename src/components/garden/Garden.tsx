@@ -19,13 +19,16 @@ const CALMO_PALETTE = {
   secondary: "#D4B483",
   stone: "#9A8475",
   stoneDark: "#5A4F43",
-  rake: "rgba(104, 92, 72, 0.35)",
+  rake: "rgba(104, 92, 72, 0.5)",
   moss: "#78A75A",
   sand: "#F2E5CF",
   starDim: "#A6B6C8",
   starBright: "#F8E8B7",
   sky1: "#1E1B2E",
   sky2: "#3C3860",
+  sunsetTop: "#F6B98B",
+  sunsetMid: "#D77F70",
+  sunsetLow: "#3F2E52",
   companionBase: "#5B8266",
   companionSoft: "#D5E2CF",
 };
@@ -88,18 +91,42 @@ const Zen = ({ scene }: { scene: Scene }) => {
 const Sky = ({ scene }: { scene: Scene }) => {
   const s = scene.sky!;
   const size = scene.size;
-  const base = `rgba(30,27,46,${0.9 + s.tintStrength * 0.1})`;
-  const topGlow = `rgba(72, 100, 140, ${0.25 + s.tintStrength * 0.25})`;
+  const sunset = s.sunsetness;
+  const gradId = `sky-grad-${Math.round(sunset * 100)}`;
+  // Interpolate between a deep-night gradient and a sunset gradient so the
+  // empty-state scene reads as "atardecer con la primera estrella".
+  const night = { top: "#2A3454", mid: "#1E1B2E", low: "#121028" };
+  const dusk = { top: CALMO_PALETTE.sunsetTop, mid: CALMO_PALETTE.sunsetMid, low: CALMO_PALETTE.sunsetLow };
+  const mix = (a: string, b: string, t: number): string => {
+    const toRgb = (hex: string): number[] => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+    const ar = toRgb(a);
+    const br = toRgb(b);
+    const mixed = ar.map((c, i) => Math.round(c * (1 - t) + br[i] * t));
+    return `rgb(${mixed[0]}, ${mixed[1]}, ${mixed[2]})`;
+  };
+  const top = mix(night.top, dusk.top, sunset);
+  const mid = mix(night.mid, dusk.mid, sunset);
+  const low = mix(night.low, dusk.low, sunset);
   return (
     <>
       <defs>
-        <linearGradient id="sky-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={topGlow} />
-          <stop offset="100%" stopColor={base} />
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={top} />
+          <stop offset="60%" stopColor={mid} />
+          <stop offset="100%" stopColor={low} />
         </linearGradient>
       </defs>
-      <rect x={0} y={0} width={size} height={size} fill={CALMO_PALETTE.sky1} rx={size * 0.08} />
-      <rect x={0} y={0} width={size} height={size} fill="url(#sky-grad)" rx={size * 0.08} />
+      <rect x={0} y={0} width={size} height={size} fill={`url(#${gradId})`} rx={size * 0.08} />
+      {sunset > 0.6 && (
+        // A soft sun just below the horizon to anchor the sunset scene.
+        <circle
+          cx={size * 0.3}
+          cy={size * 0.72}
+          r={size * 0.11}
+          fill={CALMO_PALETTE.sunsetTop}
+          opacity={0.55}
+        />
+      )}
       {s.stars.map((star, i) => (
         <circle
           key={`star-${i}`}
@@ -150,37 +177,45 @@ const Companion = ({ scene }: { scene: Scene }) => {
   const handX = shoulderX + Math.cos(armRad) * armLen;
   const handY = shoulderY + Math.sin(armRad) * armLen;
 
+  const weeklyScale = c.weeklyBoost ? 1.35 : 1;
   const plantLevels = [
     null,
-    { stem: 0.025, leaf: 0.04 },
-    { stem: 0.045, leaf: 0.065 },
-    { stem: 0.075, leaf: 0.095 },
-    { stem: 0.11, leaf: 0.13 },
-    { stem: 0.15, leaf: 0.17 },
+    { stem: 0.03, leaf: 0.04 },
+    { stem: 0.055, leaf: 0.065 },
+    { stem: 0.085, leaf: 0.1 },
+    { stem: 0.12, leaf: 0.14 },
+    { stem: 0.17, leaf: 0.19 },
   ];
   const plant = plantLevels[c.plantLevel];
+  // Pot sits on the LEFT side of the desk, away from the right-hand that
+  // reaches up during exercises, so the arm and the plant never overlap.
+  const potX = size * 0.14;
+  const potY = cy + size * 0.095;
+  const potW = size * 0.09 * weeklyScale;
+  const potH = size * 0.08 * weeklyScale;
+  const potStemX = potX + potW * 0.5;
 
   return (
     <>
       <rect x={0} y={0} width={size} height={size} fill={CALMO_PALETTE.bg} rx={size * 0.08} />
       {/* Desk */}
       <rect
-        x={size * 0.1}
+        x={size * 0.08}
         y={cy + size * 0.17}
-        width={size * 0.8}
+        width={size * 0.84}
         height={size * 0.04}
         fill={CALMO_PALETTE.stone}
         rx={size * 0.01}
       />
       <rect
-        x={size * 0.14}
+        x={size * 0.12}
         y={cy + size * 0.21}
         width={size * 0.03}
         height={size * 0.14}
         fill={CALMO_PALETTE.stone}
       />
       <rect
-        x={size * 0.83}
+        x={size * 0.85}
         y={cy + size * 0.21}
         width={size * 0.03}
         height={size * 0.14}
@@ -202,29 +237,37 @@ const Companion = ({ scene }: { scene: Scene }) => {
         height={size * 0.06}
         fill={CALMO_PALETTE.primarySoft}
       />
-      {/* Plant pot + plant */}
+      {/* Plant pot + plant on the LEFT side of the desk */}
       {plant && (
         <g>
           <rect
-            x={size * 0.72}
-            y={cy + size * 0.095}
-            width={size * 0.07}
-            height={size * 0.08}
+            x={potX}
+            y={potY}
+            width={potW}
+            height={potH}
             fill={CALMO_PALETTE.secondary}
             rx={size * 0.005}
           />
           <path
-            d={`M ${size * 0.755} ${cy + size * 0.095} Q ${size * (0.755 - plant.leaf * 0.5)} ${cy + size * (0.095 - plant.stem)} ${size * 0.755} ${cy + size * (0.095 - plant.leaf)}`}
-            fill={CALMO_PALETTE.primary}
+            d={`M ${potStemX} ${potY} Q ${potStemX - size * plant.leaf * 0.4} ${potY - size * plant.stem * weeklyScale} ${potStemX} ${potY - size * plant.leaf * weeklyScale}`}
+            fill="none"
             stroke={CALMO_PALETTE.primary}
-            strokeWidth={size * 0.004}
+            strokeWidth={size * 0.005}
           />
           <ellipse
-            cx={size * (0.755 - plant.leaf * 0.3)}
-            cy={cy + size * (0.095 - plant.leaf * 0.4)}
-            rx={size * plant.leaf * 0.4}
-            ry={size * plant.leaf * 0.2}
+            cx={potStemX - size * plant.leaf * 0.3}
+            cy={potY - size * plant.leaf * 0.4 * weeklyScale}
+            rx={size * plant.leaf * 0.4 * weeklyScale}
+            ry={size * plant.leaf * 0.22 * weeklyScale}
             fill={CALMO_PALETTE.primary}
+          />
+          <ellipse
+            cx={potStemX + size * plant.leaf * 0.3}
+            cy={potY - size * plant.leaf * 0.7 * weeklyScale}
+            rx={size * plant.leaf * 0.35 * weeklyScale}
+            ry={size * plant.leaf * 0.2 * weeklyScale}
+            fill={CALMO_PALETTE.primary}
+            opacity={0.9}
           />
         </g>
       )}
@@ -236,7 +279,8 @@ const Companion = ({ scene }: { scene: Scene }) => {
             L ${cx - size * 0.11} ${cy - size * 0.02 - slouch * 0.3} Z`}
         fill={CALMO_PALETTE.companionBase}
       />
-      {/* Arm — stretches up with exercise */}
+      {/* Arm — stretches up and to the right with exercise. The pot sits on
+          the opposite side so they never overlap. */}
       <line
         x1={shoulderX}
         y1={shoulderY}

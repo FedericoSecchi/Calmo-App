@@ -46,7 +46,7 @@ export const SEO_CONTENT: Content = {
     es: {
       h1: "Regla 20-20-20: un hábito simple para los ojos cansados",
       intro:
-        "Cada 20 minutos, mirá algo a unos 6 metros durante 20 segundos. Es una de las formas más simples de bajarle a la fatiga visual cuando trabajás con la computadora.",
+        "Cada 20 minutos, mira algo a unos 6 metros durante 20 segundos. Es una de las formas más simples de reducir la fatiga visual cuando trabajas con la computadora.",
       sections: [
         {
           h2: "Por qué funciona la regla 20-20-20",
@@ -58,15 +58,15 @@ export const SEO_CONTENT: Content = {
         {
           h2: "Cómo convertirla en hábito",
           paragraphs: [
-            "El tema es acordarse. En pleno flujo es fácil pasar una hora sin levantar la vista.",
-            "Un recordatorio suave cada 20 minutos basta. Combinalo con una pausa más larga cada 45–90 minutos para estirar, caminar un poco e hidratarte. Tu espalda, tu cuello y tu circulación también lo van a agradecer.",
+            "Lo difícil es acordarse. En pleno flujo es fácil pasar una hora sin levantar la vista.",
+            "Un recordatorio suave cada 20 minutos basta. Combínalo con una pausa más larga cada 45–90 minutos para estirar, caminar un poco e hidratarte. Tu espalda, tu cuello y tu circulación también te lo van a agradecer.",
           ],
         },
         {
           h2: "Cómo te ayuda Calmo",
           paragraphs: [
             "Calmo incluye empujones 20-20-20 durante tus bloques de foco. En cada pausa corta te invita a mirar a la distancia 20 segundos con un temporizador integrado para no tener que contar.",
-            "Si estás en algo crítico, podés posponer el recordatorio unos minutos. La idea es que la regla se vuelva un hábito natural sin que tengas que acordarte.",
+            "Si estás en algo crítico, puedes posponer el recordatorio unos minutos. La idea es que la regla se vuelva un hábito natural sin que tengas que acordarte.",
           ],
         },
       ],
@@ -106,29 +106,29 @@ export const SEO_CONTENT: Content = {
     es: {
       h1: "Estiramientos simples para hacer en el escritorio",
       intro:
-        "Unos pocos estiramientos cortos, repartidos durante el día, alcanzan para evitar que el cuello, los hombros y las muñecas se traben. Abajo tenés una rutina corta que podés hacer sin salir de la silla.",
+        "Unos pocos estiramientos cortos, repartidos durante el día, alcanzan para evitar que el cuello, los hombros y las muñecas se traben. Abajo tienes una rutina corta que puedes hacer sin salir de la silla.",
       sections: [
         {
           h2: "Rutina de 2 minutos en el escritorio",
           paragraphs: [
             "Rotación de hombros: cinco círculos lentos hacia atrás y cinco hacia adelante. Movimiento chico y controlado.",
-            "Inclinación de cuello: dejá caer la oreja derecha hacia el hombro derecho durante 15 segundos y después cambiá. Respirá.",
-            "Muñecas: extendé los brazos, flexioná las muñecas hacia arriba y hacia abajo, y hacé círculos chicos en ambos sentidos.",
-            "Twist sentado: pies en el piso, mano izquierda en la rodilla derecha y rotá suavemente. Mantené, respirá, cambiá de lado.",
+            "Inclinación de cuello: deja caer la oreja derecha hacia el hombro derecho durante 15 segundos y después cambia. Respira.",
+            "Muñecas: extiende los brazos, flexiona las muñecas hacia arriba y hacia abajo, y haz círculos pequeños en ambos sentidos.",
+            "Twist sentado: pies en el piso, mano izquierda en la rodilla derecha y rota suavemente. Mantén, respira, cambia de lado.",
           ],
         },
         {
-          h2: "Hacé que se vuelva hábito",
+          h2: "Haz que se vuelva hábito",
           paragraphs: [
             "Corto y seguido supera a largo y de vez en cuando. Tres pausas de dos minutos repartidas en el día mueven la aguja más que una clase larga de yoga.",
-            "Un recordatorio suave cada 60–90 minutos alcanza. Si no podés hacer todo, rotá los hombros y estirá las muñecas: eso solo ya ayuda.",
+            "Un recordatorio suave cada 60–90 minutos alcanza. Si no puedes hacer todo, rota los hombros y estira las muñecas: eso solo ya ayuda.",
           ],
         },
         {
           h2: "Cómo te ayuda Calmo",
           paragraphs: [
             "Calmo guía estiramientos en rutinas de 2 a 5 minutos. Son silenciosas y en texto, así que no cortan una llamada ni tu flujo.",
-            "El temporizador de foco sugiere un estiramiento en cada pausa larga, y podés elegir una rutina puntual desde la biblioteca cuando algo tira.",
+            "El temporizador de foco sugiere un estiramiento en cada pausa larga, y puedes elegir una rutina puntual desde la biblioteca cuando algo tira.",
           ],
         },
       ],
@@ -180,17 +180,17 @@ export const SEO_CONTENT: Content = {
         {
           h2: "Hábitos simples que ayudan",
           paragraphs: [
-            "Aplicá la regla 20-20-20: cada 20 minutos, mirá algo a 6 metros durante 20 segundos.",
-            "Parpadeá a propósito un par de veces cuando te acordés. El parpadeo distribuye lágrimas y resetea la superficie del ojo.",
-            "Mantené la pantalla a distancia de brazo y un poco por debajo de la línea de los ojos. Ajustá el brillo al ambiente: ni muy oscuro ni muy brillante.",
-            "Si usás anteojos, pensá en un par preparado para la distancia exacta de la pantalla.",
+            "Aplica la regla 20-20-20: cada 20 minutos, mira algo a 6 metros durante 20 segundos.",
+            "Parpadea a propósito un par de veces cuando te acuerdes. El parpadeo distribuye lágrimas y resetea la superficie del ojo.",
+            "Mantén la pantalla a distancia de brazo y un poco por debajo de la línea de los ojos. Ajusta el brillo al ambiente: ni muy oscuro ni muy brillante.",
+            "Si usas anteojos, considera un par preparado para la distancia exacta de la pantalla.",
           ],
         },
         {
           h2: "Cómo te ayuda Calmo",
           paragraphs: [
-            "Calmo te empuja a despegar la vista en el ritmo adecuado. Los empujones son suaves: podés posponerlos si estás en medio de algo.",
-            "Si aparece dolor, lo podés registrar dentro de la app. El registro queda en tu dispositivo y te ayuda a ver qué patrones lo disparan.",
+            "Calmo te empuja a despegar la vista en el ritmo adecuado. Los empujones son suaves: puedes posponerlos si estás en medio de algo.",
+            "Si aparece dolor, lo puedes registrar dentro de la app. El registro queda en tu dispositivo y te ayuda a ver qué patrones lo disparan.",
           ],
         },
       ],
@@ -243,14 +243,14 @@ export const SEO_CONTENT: Content = {
           h2: "Qué hacer en la pausa",
           paragraphs: [
             "La idea es cambiar: la distancia (mirar lejos), la posición (pararte, estirar) y la intensidad (relajar ojos y hombros).",
-            "Scrollear el celular no cuenta: el ojo sigue en una pantalla cercana. Una ventana, una pared, el techo o cualquier objeto al fondo de la habitación es el blanco adecuado.",
+            "Scrollear el teléfono no cuenta: el ojo sigue en una pantalla cercana. Una ventana, una pared, el techo o cualquier objeto al fondo de la habitación es el blanco adecuado.",
           ],
         },
         {
           h2: "Cómo te ayuda Calmo",
           paragraphs: [
-            "Calmo encadena bloques de foco con el tipo de pausa adecuado. Elegís el preset que acompaña tu trabajo (ligero, estándar, foco) y la app se encarga del tiempo.",
-            "Si necesitás, podés posponer una pausa o sumar una manual. Los datos quedan tuyos.",
+            "Calmo encadena bloques de foco con el tipo de pausa adecuado. Eliges el preset que acompaña tu trabajo (ligero, estándar, foco) y la app se encarga del tiempo.",
+            "Si lo necesitas, puedes posponer una pausa o sumar una manual. Los datos quedan tuyos.",
           ],
         },
       ],
@@ -293,21 +293,21 @@ export const SEO_CONTENT: Content = {
         {
           h2: "Primero, el puesto de trabajo",
           paragraphs: [
-            "La parte alta de la pantalla cerca de la línea de los ojos. Si trabajás con laptop, sumá teclado externo y elevá la pantalla con un soporte o unos libros.",
+            "La parte alta de la pantalla cerca de la línea de los ojos. Si trabajas con laptop, suma teclado externo y eleva la pantalla con un soporte o unos libros.",
             "Codos a 90°, hombros hacia atrás y abajo, pies en el piso. La pantalla a distancia de un brazo.",
           ],
         },
         {
-          h2: "Mové el cuello un poco, varias veces",
+          h2: "Mueve el cuello un poco, varias veces",
           paragraphs: [
-            "Cada 60–90 minutos hacé una micro-rutina: rotaciones lentas de lado a lado, inclinaciones suaves oreja-hombro y un chin tuck (empujá el mentón hacia atrás sin inclinar la cabeza).",
-            "Corto y seguido supera a largo y de vez en cuando. Si algo duele mucho, pará y consultá a un profesional.",
+            "Cada 60–90 minutos haz una micro-rutina: rotaciones lentas de lado a lado, inclinaciones suaves oreja-hombro y un chin tuck (empuja el mentón hacia atrás sin inclinar la cabeza).",
+            "Corto y seguido supera a largo y de vez en cuando. Si algo duele mucho, para y consulta a un profesional.",
           ],
         },
         {
           h2: "Cómo te ayuda Calmo",
           paragraphs: [
-            "Calmo tiene rutinas guiadas de cuello en bloques de 2 a 3 minutos. Son en texto, así que las podés hacer en una llamada.",
+            "Calmo tiene rutinas guiadas de cuello en bloques de 2 a 3 minutos. Son en texto, así que las puedes hacer en una llamada.",
             "El registro de dolor queda en tu dispositivo y te permite ver qué días o rutinas te ayudan, sin enviar nada a un servidor.",
           ],
         },
@@ -346,26 +346,26 @@ export const SEO_CONTENT: Content = {
     es: {
       h1: "Dolor de espalda en la oficina: postura y hábitos simples que suman",
       intro:
-        "El dolor de espalda rara vez viene de un solo mal día: se acumula con muchos días de la misma postura y sin movimiento. La buena noticia: también se desinfla con el mismo efecto acumulado de hábitos chicos y constantes.",
+        "El dolor de espalda rara vez viene de un solo mal día: se acumula con muchos días de la misma postura y sin movimiento. La buena noticia: también se desinfla con el mismo efecto acumulado de hábitos pequeños y constantes.",
       sections: [
         {
           h2: "Silla y pantalla",
           paragraphs: [
-            "Sentate bien atrás, pies apoyados, rodillas a 90°. Si la silla te empuja la lumbar hacia afuera, sumá un cojín chico.",
+            "Siéntate bien atrás, pies apoyados, rodillas a 90°. Si la silla te empuja la lumbar hacia afuera, suma un cojín pequeño.",
             "Pantalla a la altura de los ojos y a distancia de un brazo. Hombros hacia abajo, codos cerca del cuerpo.",
           ],
         },
         {
-          h2: "Movete una vez por hora",
+          h2: "Muévete una vez por hora",
           paragraphs: [
-            "Pará un minuto o dos cada 60–90 minutos. Hacé una vuelta corta, un backbend suave, rotaciones de hombros.",
+            "Para un minuto o dos cada 60–90 minutos. Haz una vuelta corta, un backbend suave, rotaciones de hombros.",
             "Una rutina sentada corta también suma: gato-vaca en la silla, inclinaciones laterales y un twist. Tres minutos alcanzan para resetear.",
           ],
         },
         {
           h2: "Cómo te ayuda Calmo",
           paragraphs: [
-            "Calmo lleva el ritmo de las pausas y te ofrece rutinas rápidas amigables con la espalda cuando toca. Si necesitás, posponés el recordatorio.",
+            "Calmo lleva el ritmo de las pausas y te ofrece rutinas rápidas amigables con la espalda cuando toca. Si lo necesitas, pospones el recordatorio.",
             "Las rachas diarias hacen visible el hábito. Los datos de dolor quedan en tu dispositivo y te ayudan a ver qué está funcionando.",
           ],
         },
@@ -405,28 +405,28 @@ export const SEO_CONTENT: Content = {
     es: {
       h1: "Pausas pomodoro: el lado corporal del foco",
       intro:
-        "El método Pomodoro (25 minutos de foco, 5 de pausa) ayuda con la concentración. La calidad de la pausa es lo que decide si tu cuerpo te agradece el viernes.",
+        "El método Pomodoro (25 minutos de foco, 5 de pausa) ayuda con la concentración. La calidad de la pausa es lo que decide si tu cuerpo te lo agradece el viernes.",
       sections: [
         {
           h2: "Una pausa pomodoro amigable con el cuerpo",
           paragraphs: [
-            "Pará y pararte. Mirá por la ventana o al fondo de la habitación 20 segundos: eso es la regla 20-20-20 dentro de un pomodoro.",
-            "Sacudí las manos y rotá los hombros.",
-            "Tomá agua. La hidratación importa más de lo que la mayoría cree.",
+            "Párate. Mira por la ventana o al fondo de la habitación 20 segundos: eso es la regla 20-20-20 dentro de un pomodoro.",
+            "Sacude las manos y rota los hombros.",
+            "Toma agua. La hidratación importa más de lo que la mayoría cree.",
           ],
         },
         {
-          h2: "Más largo cada cuatro ciclos",
+          h2: "Más larga cada cuatro ciclos",
           paragraphs: [
-            "Después de cuatro pomodoros, hacé una pausa de 15–20 minutos. Caminá, comé algo, cambiá de escenario.",
+            "Después de cuatro pomodoros, haz una pausa de 15–20 minutos. Camina, come algo, cambia de escenario.",
             "Esa pausa larga es donde pasa la recuperación de verdad: física, mental y emocional.",
           ],
         },
         {
           h2: "Cómo te ayuda Calmo",
           paragraphs: [
-            "El temporizador de Calmo lleva el ciclo por vos y sugiere acciones amigables con el cuerpo en las pausas: 20-20-20, un estiramiento rápido, agua.",
-            "Si estás metido en el flow, posponés el recordatorio o saltás la pausa. Nada te lo impone.",
+            "El temporizador de Calmo lleva el ciclo por ti y sugiere acciones amigables con el cuerpo en las pausas: 20-20-20, un estiramiento rápido, agua.",
+            "Si estás metido en el flow, pospones el recordatorio o saltas la pausa. Nada te lo impone.",
           ],
         },
       ],
@@ -467,23 +467,23 @@ export const SEO_CONTENT: Content = {
         "Un buen ciclo de foco no se trata tanto de obligarte a trabajar un número mágico de minutos, sino de acompañar tu energía y darle al cuerpo lo que necesita entre bloques.",
       sections: [
         {
-          h2: "Elegí un bloque que te sirva",
+          h2: "Elige un bloque que te sirva",
           paragraphs: [
             "Bloques cortos (25 minutos) ayudan si estás disperso o si estás volviendo al hábito del trabajo con foco.",
             "Bloques más largos (50 minutos) van bien para trabajo profundo, siempre que después tomes la pausa de verdad.",
           ],
         },
         {
-          h2: "Diseñá la pausa, no solo el bloque",
+          h2: "Diseña la pausa, no solo el bloque",
           paragraphs: [
-            "Cambiá la distancia (mirar lejos), la posición (pararte, estirar) y la intensidad (relajar ojos y hombros).",
+            "Cambia la distancia (mirar lejos), la posición (pararte, estirar) y la intensidad (relajar ojos y hombros).",
             "Agua, un poco de movimiento y unas respiraciones profundas superan a scrollear el teléfono cinco minutos.",
           ],
         },
         {
           h2: "Cómo te ayuda Calmo",
           paragraphs: [
-            "Calmo ofrece tres presets (ligero, estándar, foco) con distintos largos de bloque y pausa. Podés cambiar cualquier día.",
+            "Calmo ofrece tres presets (ligero, estándar, foco) con distintos largos de bloque y pausa. Puedes cambiar cualquier día.",
             "El temporizador se encarga de las transiciones y sugiere en silencio qué hacer en la pausa.",
           ],
         },

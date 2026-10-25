@@ -40,6 +40,11 @@ export const LEGAL_PATHS = {
   terms: { en: "/terms/", es: "/es/terminos/" },
 };
 
+export const JOIN_PATHS: Record<Lang, string> = {
+  en: "/join/",
+  es: "/es/unirse/",
+};
+
 export interface PublicRoute {
   key: string;
   lang: Lang;

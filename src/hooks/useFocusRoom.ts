@@ -7,6 +7,29 @@ export const ROOM_BREAK_SEC = 5 * 60;
 
 export type RoomPhase = "focus" | "break";
 
+export type RoomRhythmId = "light" | "standard" | "focus";
+
+export interface RoomRhythm {
+  id: RoomRhythmId;
+  focusSec: number;
+  breakSec: number;
+}
+
+export const ROOM_RHYTHMS: Record<RoomRhythmId, RoomRhythm> = {
+  light: { id: "light", focusSec: 60 * 60, breakSec: 10 * 60 },
+  standard: { id: "standard", focusSec: 45 * 60, breakSec: 5 * 60 },
+  focus: { id: "focus", focusSec: 90 * 60, breakSec: 10 * 60 },
+};
+
+// Infer the rhythm from a focus-phase duration (in seconds). Falls back to
+// 25-minute pomodoro when nothing matches so pre-existing rooms keep working.
+function rhythmFromFocusSec(focusSec: number): RoomRhythm {
+  for (const r of Object.values(ROOM_RHYTHMS)) {
+    if (Math.abs(r.focusSec - focusSec) < 60) return r;
+  }
+  return { id: "standard", focusSec: ROOM_FOCUS_SEC, breakSec: ROOM_BREAK_SEC };
+}
+
 export interface RoomTimerState {
   phase: RoomPhase;
   isRunning: boolean;
@@ -14,6 +37,9 @@ export interface RoomTimerState {
   durationSec: number;
   pausedRemainingSec: number; // meaningful only when !isRunning
   updatedAt: number;
+  rhythmId: RoomRhythmId;
+  focusSec: number;
+  breakSec: number;
 }
 
 export interface RoomInfo {
@@ -40,13 +66,16 @@ interface Broadcast {
   activity: { payload: { kind: "exercise" | "water"; byKey: string } };
 }
 
-const initialState = (): RoomTimerState => ({
+const initialState = (rhythm: RoomRhythm): RoomTimerState => ({
   phase: "focus",
   isRunning: false,
   phaseStartAt: Date.now(),
-  durationSec: ROOM_FOCUS_SEC,
-  pausedRemainingSec: ROOM_FOCUS_SEC,
+  durationSec: rhythm.focusSec,
+  pausedRemainingSec: rhythm.focusSec,
   updatedAt: 0,
+  rhythmId: rhythm.id,
+  focusSec: rhythm.focusSec,
+  breakSec: rhythm.breakSec,
 });
 
 const computeRemainingSec = (state: RoomTimerState): number => {
@@ -55,12 +84,17 @@ const computeRemainingSec = (state: RoomTimerState): number => {
   return Math.max(0, state.durationSec - elapsed);
 };
 
-export function useFocusRoom(code: string | undefined, name: string) {
+export function useFocusRoom(
+  code: string | undefined,
+  name: string,
+  options?: { initialRhythmId?: RoomRhythmId },
+) {
   const [status, setStatus] = useState<RoomStatus>("loading");
   const [info, setInfo] = useState<RoomInfo | null>(null);
   const [presence, setPresence] = useState<RoomPresence[]>([]);
-  const [state, setState] = useState<RoomTimerState>(() => initialState());
-  const [remainingSec, setRemainingSec] = useState<number>(ROOM_FOCUS_SEC);
+  const initialRhythm = ROOM_RHYTHMS[options?.initialRhythmId ?? "standard"];
+  const [state, setState] = useState<RoomTimerState>(() => initialState(initialRhythm));
+  const [remainingSec, setRemainingSec] = useState<number>(initialRhythm.focusSec);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const stateRef = useRef<RoomTimerState>(state);
@@ -126,9 +160,10 @@ export function useFocusRoom(code: string | undefined, name: string) {
   const skip = useCallback(() => {
     applyLocal((prev) => {
       const nextPhase: RoomPhase = prev.phase === "focus" ? "break" : "focus";
-      const nextDuration = nextPhase === "focus" ? ROOM_FOCUS_SEC : ROOM_BREAK_SEC;
+      const nextDuration = nextPhase === "focus" ? prev.focusSec : prev.breakSec;
       const now = Date.now();
       return {
+        ...prev,
         phase: nextPhase,
         isRunning: true,
         phaseStartAt: now,
@@ -138,6 +173,26 @@ export function useFocusRoom(code: string | undefined, name: string) {
       };
     }, true);
   }, [applyLocal]);
+
+  const setRhythm = useCallback(
+    (rhythmId: RoomRhythmId) => {
+      applyLocal((prev) => {
+        if (prev.isRunning) return prev;
+        const r = ROOM_RHYTHMS[rhythmId];
+        return {
+          ...prev,
+          rhythmId: r.id,
+          focusSec: r.focusSec,
+          breakSec: r.breakSec,
+          phase: "focus",
+          durationSec: r.focusSec,
+          pausedRemainingSec: r.focusSec,
+          updatedAt: Date.now(),
+        };
+      }, true);
+    },
+    [applyLocal],
+  );
 
   const logActivity = useCallback(
     async (kind: "exercise" | "water") => {
@@ -252,14 +307,21 @@ export function useFocusRoom(code: string | undefined, name: string) {
       .on("broadcast", { event: "state" }, ({ payload }: Broadcast["state"]) => {
         if (!payload || typeof payload.updatedAt !== "number") return;
         if (payload.updatedAt < stateRef.current.updatedAt) return;
-        setState(payload);
+        // Backfill rhythm fields for any legacy payload that lacks them.
+        const r = rhythmFromFocusSec(payload.focusSec ?? payload.durationSec ?? ROOM_FOCUS_SEC);
+        setState({
+          ...payload,
+          rhythmId: payload.rhythmId ?? r.id,
+          focusSec: payload.focusSec ?? r.focusSec,
+          breakSec: payload.breakSec ?? r.breakSec,
+        });
       })
       .on("broadcast", { event: "request_state" }, ({ payload }: Broadcast["request_state"]) => {
         if (!payload?.fromKey || payload.fromKey === myKeyRef.current) return;
-        const cur = stateRef.current;
-        if (cur.updatedAt > 0) {
-          channel.send({ type: "broadcast", event: "state", payload: cur }).catch(() => {});
-        }
+        // Always answer so joiners pick up the creator's rhythm. If we haven't
+        // mutated state yet (updatedAt=0) we still want the newcomer to adopt
+        // our rhythm, so we send the current state as-is.
+        channel.send({ type: "broadcast", event: "state", payload: stateRef.current }).catch(() => {});
       })
       .on("broadcast", { event: "activity" }, () => {
         void refreshCounts();
@@ -323,9 +385,10 @@ export function useFocusRoom(code: string | undefined, name: string) {
 
     const endedPhase = stateRef.current.phase;
     const nextPhase: RoomPhase = endedPhase === "focus" ? "break" : "focus";
-    const nextDuration = nextPhase === "focus" ? ROOM_FOCUS_SEC : ROOM_BREAK_SEC;
+    const nextDuration = nextPhase === "focus" ? stateRef.current.focusSec : stateRef.current.breakSec;
     const now = Date.now();
     const nextState: RoomTimerState = {
+      ...stateRef.current,
       phase: nextPhase,
       isRunning: true,
       phaseStartAt: now,
@@ -359,6 +422,7 @@ export function useFocusRoom(code: string | undefined, name: string) {
     pause,
     resume,
     skip,
+    setRhythm,
     logActivity,
     refreshCounts,
   };

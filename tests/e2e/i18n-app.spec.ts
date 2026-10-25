@@ -26,47 +26,78 @@ const FORBIDDEN_IN_ENGLISH = [
   "Instalar",
   "Siguiente",
   "Continuar",
+  "Jardín",
+  "Sala",
+  "Compañero",
 ];
 
-async function openGuestInEnglish(page: Page) {
+// English words that should NOT appear in the Spanish UI. The focus is on
+// strings that are easy to leave hardcoded (counters, labels, suffixes).
+const FORBIDDEN_IN_SPANISH = [
+  "Rhythm",
+  "Breaks",
+  "Water",
+  "Exercises",
+  "Focus completed",
+  "you",
+  "Sign in",
+  "Sign out",
+  "Settings",
+  "Today",
+  "This week",
+  "Garden",
+  "Companion",
+  "Zen garden",
+  "Night sky",
+];
+
+async function openGuest(page: Page, lang: "en" | "es") {
   await page.goto("/");
-  // Set language and guest flag before any app code runs
-  await page.evaluate(() => {
+  await page.evaluate((lang) => {
     try {
-      localStorage.setItem("calmo_lang", "en");
+      localStorage.setItem("calmo_lang", lang);
       localStorage.setItem("calmo_guest_mode", "1");
     } catch {
       /* ignore */
     }
-  });
+  }, lang);
 }
 
-async function assertNoSpanish(page: Page, path: string) {
+async function assertNoWords(page: Page, path: string, forbidden: string[], label: string) {
   await page.goto(path);
-  // Wait for the main content to be present
   await page.waitForSelector("main, h1, h2, nav, [role='alert'], [role='dialog']", { timeout: 10_000 }).catch(() => {});
   const text = await page.evaluate(() => document.body.innerText);
-  const found = FORBIDDEN_IN_ENGLISH.filter((word) => {
-    // Word-boundary-ish match: ensure not inside a larger token.
+  const found = forbidden.filter((word) => {
     const re = new RegExp(`(^|[^\\p{L}])${word}($|[^\\p{L}])`, "u");
     return re.test(text);
   });
-  expect
-    .soft(found, `${path} leaked Spanish words into the English UI`)
-    .toEqual([]);
+  expect.soft(found, `${path} [${label}] leaked words`).toEqual([]);
 }
 
 test.describe("App is bilingual (EN mode leaks no hardcoded Spanish)", () => {
   test("every app screen in English", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
-    await openGuestInEnglish(page);
-    await assertNoSpanish(page, "/app");
-    await assertNoSpanish(page, "/app/exercises");
-    await assertNoSpanish(page, "/app/pain");
-    await assertNoSpanish(page, "/app/settings");
-    await assertNoSpanish(page, "/onboarding");
-    await assertNoSpanish(page, "/auth");
+    await openGuest(page, "en");
+    await assertNoWords(page, "/app", FORBIDDEN_IN_ENGLISH, "en");
+    await assertNoWords(page, "/app/exercises", FORBIDDEN_IN_ENGLISH, "en");
+    await assertNoWords(page, "/app/pain", FORBIDDEN_IN_ENGLISH, "en");
+    await assertNoWords(page, "/app/settings", FORBIDDEN_IN_ENGLISH, "en");
+    await assertNoWords(page, "/onboarding", FORBIDDEN_IN_ENGLISH, "en");
+    await assertNoWords(page, "/auth", FORBIDDEN_IN_ENGLISH, "en");
+    expect(errors).toEqual([]);
+  });
+
+  test("every app screen in Spanish stays Spanish-only", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await openGuest(page, "es");
+    await assertNoWords(page, "/app", FORBIDDEN_IN_SPANISH, "es");
+    await assertNoWords(page, "/app/exercises", FORBIDDEN_IN_SPANISH, "es");
+    await assertNoWords(page, "/app/pain", FORBIDDEN_IN_SPANISH, "es");
+    await assertNoWords(page, "/app/settings", FORBIDDEN_IN_SPANISH, "es");
+    await assertNoWords(page, "/onboarding", FORBIDDEN_IN_SPANISH, "es");
+    await assertNoWords(page, "/auth", FORBIDDEN_IN_SPANISH, "es");
     expect(errors).toEqual([]);
   });
 });

@@ -23,7 +23,7 @@ const SEO_META: Record<SeoPageKey, { en: { title: string; description: string };
     },
     es: {
       title: "Regla 20-20-20 para la vista | Calmo",
-      description: "Qué es la regla 20-20-20, por qué reduce la fatiga visual y cómo Calmo te ayuda a aplicarla con recordatorios suaves mientras trabajás.",
+      description: "Qué es la regla 20-20-20, por qué reduce la fatiga visual y cómo Calmo te ayuda a aplicarla con recordatorios suaves mientras trabajas.",
     },
   },
   deskStretch: {
@@ -33,7 +33,7 @@ const SEO_META: Record<SeoPageKey, { en: { title: string; description: string };
     },
     es: {
       title: "Estiramientos simples para hacer en el escritorio | Calmo",
-      description: "Un set corto de estiramientos para cuello, espalda y muñecas que podés hacer sin salir de tu silla. Guiados por Calmo en rutinas de 2 a 5 minutos.",
+      description: "Un set corto de estiramientos para cuello, espalda y muñecas que puedes hacer sin salir de tu silla. Guiados por Calmo en rutinas de 2 a 5 minutos.",
     },
   },
   eyeStrain: {
@@ -83,7 +83,7 @@ const SEO_META: Record<SeoPageKey, { en: { title: string; description: string };
     },
     es: {
       title: "Pausas pomodoro: el lado corporal del foco | Calmo",
-      description: "Pomodoro ayuda con el foco, pero lo que hacés en la pausa importa igual. Guía práctica para pausas pomodoro amigables con el cuerpo.",
+      description: "Pomodoro ayuda con el foco, pero lo que haces en la pausa importa igual. Guía práctica para pausas pomodoro amigables con el cuerpo.",
     },
   },
   focusCycles: {

@@ -8,6 +8,10 @@ interface Options {
   path: string;
   altPath?: string;
   lang: Lang;
+  /** When true, sets a `robots` meta of `noindex, nofollow`. Used by /join/. */
+  noindex?: boolean;
+  /** Overrides the default og image path (e.g. /og-image-join-en.png). */
+  ogImagePath?: string;
 }
 
 function setMeta(name: string, content: string, isProperty = false) {
@@ -42,7 +46,7 @@ function removeAlternates() {
   document.querySelectorAll('link[rel="alternate"][hreflang]').forEach((n) => n.parentNode?.removeChild(n));
 }
 
-export function usePageSEO({ title, description, path, altPath, lang }: Options) {
+export function usePageSEO({ title, description, path, altPath, lang, noindex, ogImagePath }: Options) {
   useEffect(() => {
     document.title = title;
     setMeta("description", description);
@@ -52,9 +56,14 @@ export function usePageSEO({ title, description, path, altPath, lang }: Options)
     setMeta("og:description", description, true);
     setMeta("og:url", canonical, true);
     setMeta("og:type", "article", true);
-    setMeta("og:locale", lang === "es" ? "es_AR" : "en_US", true);
+    setMeta("og:locale", lang === "es" ? "es_ES" : "en_US", true);
+    if (ogImagePath) {
+      setMeta("og:image", `${SITE_URL}${ogImagePath}`, true);
+      setMeta("twitter:image", `${SITE_URL}${ogImagePath}`);
+    }
     setMeta("twitter:title", title);
     setMeta("twitter:description", description);
+    setMeta("robots", noindex ? "noindex, nofollow" : "index, follow");
     document.documentElement.lang = lang;
 
     removeAlternates();
@@ -63,5 +72,5 @@ export function usePageSEO({ title, description, path, altPath, lang }: Options)
     setLink("alternate", enHref, "en");
     setLink("alternate", esHref, "es");
     setLink("alternate", enHref, "x-default");
-  }, [title, description, path, altPath, lang]);
+  }, [title, description, path, altPath, lang, noindex, ogImagePath]);
 }

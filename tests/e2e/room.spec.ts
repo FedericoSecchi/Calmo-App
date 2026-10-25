@@ -119,6 +119,21 @@ test.describe("Focus room", () => {
       if (ctxA) await ctxA.close();
       if (ctxB) await ctxB.close();
       await deleteAccountByCredentials(email, STRONG_TEST_PASSWORD);
+      // The room (and its events) must cascade-delete with the creator.
+      // get_focus_room returns an empty array when the code is gone.
+      const after = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_focus_room`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ p_code: code }),
+      });
+      const afterData = (await after.json()) as unknown[];
+      expect(
+        Array.isArray(afterData) ? afterData.length : 1,
+        `room ${code} should cascade-delete when the creator's account is removed`,
+      ).toBe(0);
     }
   });
 });

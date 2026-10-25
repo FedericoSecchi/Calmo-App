@@ -23,6 +23,19 @@ const COPY = {
   },
 };
 
+const JOIN_COPY = {
+  en: {
+    kicker: "Calmo · Focus room",
+    title: "You've been invited to focus together.",
+    tag: "A shared focus timer that stays in sync.",
+  },
+  es: {
+    kicker: "Calmo · Sala de foco",
+    title: "Te invitaron a enfocarte en equipo.",
+    tag: "Un temporizador compartido que queda en sincronía.",
+  },
+};
+
 // Load Hammersmith One + Montserrat via @fontsource woff2 as base64 data URLs
 // so the OG image generation does not hit any external network.
 function fontData(relative) {
@@ -64,6 +77,14 @@ const page = await context.newPage();
 for (const lang of ["en", "es"]) {
   await page.setContent(html(COPY[lang]), { waitUntil: "networkidle" });
   const outPath = join(DIST, `og-image-${lang}.png`);
+  await page.screenshot({ path: outPath, type: "png", omitBackground: false, clip: { x: 0, y: 0, width: 1200, height: 630 } });
+  const ok = existsSync(outPath);
+  console.log(`[og] ${ok ? "✓" : "✗"} ${outPath}`);
+}
+
+for (const lang of ["en", "es"]) {
+  await page.setContent(html(JOIN_COPY[lang]), { waitUntil: "networkidle" });
+  const outPath = join(DIST, `og-image-join-${lang}.png`);
   await page.screenshot({ path: outPath, type: "png", omitBackground: false, clip: { x: 0, y: 0, width: 1200, height: 630 } });
   const ok = existsSync(outPath);
   console.log(`[og] ${ok ? "✓" : "✗"} ${outPath}`);

@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import http from "node:http";
 import net from "node:net";
 import { chromium } from "@playwright/test";
-import { allPublicRoutes } from "./routes.mjs";
+import { allPublicRoutes, allNoindexRoutes } from "./routes.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, "..", "dist");
@@ -84,7 +84,7 @@ try {
   page.setDefaultTimeout(15000);
   page.setDefaultNavigationTimeout(15000);
 
-  const routes = allPublicRoutes();
+  const routes = [...allPublicRoutes(), ...allNoindexRoutes()];
   let success = 0;
   const failures = [];
 
