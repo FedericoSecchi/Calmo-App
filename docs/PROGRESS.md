@@ -90,6 +90,7 @@ Visual-review fixes across the whole stack. Highlights:
 - `30ab4ba0` (local verify run #1 — garden test failure)
 - `1a27a08f` (local verify run #2 — all PASS; room cascade-delete assertion verified)
 - `b6f96db7` (local verify run #3 — final PASS at 98/100/100/100; cascade-delete verified)
+- `1d2a18d6` (remote e2e against prod — polish-pass verify PASS, build-id af22c4f)
 
 ## Pending / manual review
 
