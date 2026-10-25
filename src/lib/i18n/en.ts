@@ -613,6 +613,28 @@ export const en = {
         "Delete your account and every piece of data linked to it on the server? This cannot be undone.",
       deleteAccountDone: "Account deleted.",
     },
+    garden: {
+      sectionTitle: "Your garden",
+      todayLabel: "Today",
+      weekLabel: "This week",
+      themeTitle: "Garden style",
+      themeHint: "Pick the style for your garden. Rooms keep their own style.",
+      themes: {
+        zen: "Zen garden",
+        sky: "Night sky",
+        companion: "Companion",
+      },
+      themeDesc: {
+        zen: "Sand furrows, stones and moss grow with your breaks.",
+        sky: "Stars light up and the sky deepens as the day goes.",
+        companion: "A quiet desk companion that relaxes with you.",
+      },
+      share: "Share",
+      download: "Download",
+      exportError: "Couldn't export the image. Please try again.",
+      shareText: "My Calmo garden today — {counts}. calmo.fit",
+      summary: "{breaks} breaks · {exercises} exercises · {water} water",
+    },
     room: {
       shareTitle: "Focus with friends",
       shareDesc:

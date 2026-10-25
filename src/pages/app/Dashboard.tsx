@@ -28,12 +28,17 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useWaterLogs } from "@/hooks/useWaterLogs";
 import { useManualBreakAdjustments } from "@/hooks/useManualBreakAdjustments";
+import { useExerciseCompletions } from "@/hooks/useExerciseCompletions";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFocusTimer, presets, type PresetId } from "@/contexts/FocusTimerContext";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { track } from "@/lib/analytics";
 import { Users as UsersIcon } from "lucide-react";
+import { GardenCard } from "@/components/garden/GardenCard";
+import { useGardenTheme } from "@/hooks/useGardenTheme";
+import type { GardenTheme } from "@/lib/garden/engine";
+import { getTodayCount, getWeekCount } from "@/lib/stats";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -60,7 +65,28 @@ const Dashboard = () => {
   const d = t.app.dashboard;
   const s = t.app.timer.settings;
   const roomT = t.app.room;
+  const gardenT = t.app.garden;
   const stats = useDashboardStats();
+  const { completions: exerciseCompletions } = useExerciseCompletions();
+  const { theme: gardenTheme, setTheme: setGardenTheme } = useGardenTheme();
+
+  const exerciseCompletionsLogs = exerciseCompletions.map((c) => ({ created_at: c.completed_at }));
+  const exerciseToday = getTodayCount(exerciseCompletionsLogs);
+  const exerciseWeek = getWeekCount(exerciseCompletionsLogs);
+
+  const gardenCountsToday = {
+    focus: Math.max(0, stats.timerBreaksToday),
+    break: Math.max(0, stats.breaksToday),
+    exercise: exerciseToday,
+    water: Math.max(0, stats.waterToday),
+  };
+  const gardenCountsWeek = {
+    focus: Math.max(0, stats.breaksThisWeek),
+    break: Math.max(0, stats.breaksThisWeek),
+    exercise: exerciseWeek,
+    water: Math.max(0, stats.waterThisWeek),
+  };
+  const gardenSeed = (user?.id || "guest") + "::calmo";
   const { addWaterGlass, removeWaterGlass, isAdding: isAddingWater } = useWaterLogs();
   const { adjustToday } = useManualBreakAdjustments();
   const {
@@ -623,6 +649,31 @@ const Dashboard = () => {
                     </div>
                   </div>
                 </div>
+
+                <div className="rounded-2xl border border-border/30 bg-card p-4">
+                  <p className="text-sm font-medium mb-1">{gardenT.themeTitle}</p>
+                  <p className="text-xs text-muted-foreground mb-3">{gardenT.themeHint}</p>
+                  <div className="space-y-2">
+                    {(["zen", "sky", "companion"] as GardenTheme[]).map((themeId) => (
+                      <button
+                        key={themeId}
+                        onClick={() => setGardenTheme(themeId)}
+                        className={`w-full p-3 rounded-xl border-2 transition-all text-left ${
+                          gardenTheme === themeId
+                            ? "border-primary bg-primary/5"
+                            : "border-border bg-background hover:border-border/80"
+                        }`}
+                      >
+                        <p className="font-medium text-foreground text-sm">
+                          {gardenT.themes[themeId]}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {gardenT.themeDesc[themeId]}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
@@ -732,6 +783,37 @@ const Dashboard = () => {
           </motion.div>
         </div>
       </section>
+
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.16 }}
+        className="mb-8"
+      >
+        <h2 className="font-heading text-base text-foreground mb-3">
+          {gardenT.sectionTitle}
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <GardenCard
+            theme={gardenTheme}
+            counts={gardenCountsToday}
+            seed={gardenSeed}
+            heading={gardenT.todayLabel}
+            subheading={gardenT.themes[gardenTheme]}
+            trackSource="dashboard_today"
+          />
+          <GardenCard
+            theme={gardenTheme}
+            counts={gardenCountsWeek}
+            seed={gardenSeed + "::week"}
+            heading={gardenT.weekLabel}
+            subheading={gardenT.themes[gardenTheme]}
+            weekly
+            trackSource="dashboard_week"
+            showActions={false}
+          />
+        </div>
+      </motion.section>
 
       <motion.section
         initial={{ opacity: 0, y: 16 }}

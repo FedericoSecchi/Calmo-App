@@ -10,8 +10,6 @@ import {
   Users,
   Droplets,
   Activity,
-  Target,
-  Trees,
   Loader2,
   Home,
 } from "lucide-react";
@@ -20,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useFocusRoom } from "@/hooks/useFocusRoom";
 import { useT, format } from "@/lib/i18n";
 import { track } from "@/lib/analytics";
+import { GardenCard } from "@/components/garden/GardenCard";
 
 const ROOM_NAME_KEY = "calmo_room_name";
 
@@ -298,43 +297,41 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.14 }}
-        className="rounded-2xl border border-border/30 bg-card p-4"
+        className="space-y-3"
       >
-        <div className="flex items-center gap-2 mb-3">
-          <Trees className="h-4 w-4 text-primary" />
-          <p className="text-sm font-medium">
-            {phaseLabel} · {info?.gardenTheme ?? "zen"}
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-border/30 p-3">
-            <Target className="h-4 w-4 text-primary mb-1" />
-            <p className="text-xl font-heading text-foreground">{info?.focusCount ?? 0}</p>
-            <p className="text-xs text-muted-foreground">{r.counters.focus}</p>
-          </div>
-          <div className="rounded-xl border border-border/30 p-3">
-            <Target className="h-4 w-4 text-secondary mb-1" />
-            <p className="text-xl font-heading text-foreground">{info?.breakCount ?? 0}</p>
-            <p className="text-xs text-muted-foreground">{r.counters.break}</p>
-          </div>
-          <button
-            type="button"
+        <GardenCard
+          theme={info?.gardenTheme ?? "zen"}
+          counts={{
+            focus: info?.focusCount ?? 0,
+            break: info?.breakCount ?? 0,
+            exercise: info?.exerciseCount ?? 0,
+            water: info?.waterCount ?? 0,
+          }}
+          seed={`room:${code}`}
+          heading={`${phaseLabel} · ${info?.gardenTheme ?? "zen"}`}
+          trackSource="room"
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => void logActivity("exercise")}
-            className="rounded-xl border border-border/30 p-3 text-left hover:border-primary/50 transition-colors"
+            className="justify-start h-auto py-2"
           >
-            <Activity className="h-4 w-4 text-primary mb-1" />
-            <p className="text-xl font-heading text-foreground">{info?.exerciseCount ?? 0}</p>
-            <p className="text-xs text-muted-foreground">{r.counters.exercise}</p>
-          </button>
-          <button
-            type="button"
+            <Activity className="h-4 w-4 mr-2 text-primary" />
+            <span className="text-xs">{r.counters.exercise}</span>
+            <span className="ml-auto font-heading">{info?.exerciseCount ?? 0}</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => void logActivity("water")}
-            className="rounded-xl border border-border/30 p-3 text-left hover:border-primary/50 transition-colors"
+            className="justify-start h-auto py-2"
           >
-            <Droplets className="h-4 w-4 text-primary mb-1" />
-            <p className="text-xl font-heading text-foreground">{info?.waterCount ?? 0}</p>
-            <p className="text-xs text-muted-foreground">{r.counters.water}</p>
-          </button>
+            <Droplets className="h-4 w-4 mr-2 text-primary" />
+            <span className="text-xs">{r.counters.water}</span>
+            <span className="ml-auto font-heading">{info?.waterCount ?? 0}</span>
+          </Button>
         </div>
       </motion.section>
 

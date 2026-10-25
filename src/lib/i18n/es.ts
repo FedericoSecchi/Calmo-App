@@ -613,6 +613,28 @@ export const es: Dict = {
         "¿Eliminar tu cuenta y todos los datos asociados en el servidor? No se puede deshacer.",
       deleteAccountDone: "Cuenta eliminada.",
     },
+    garden: {
+      sectionTitle: "Tu jardín",
+      todayLabel: "Hoy",
+      weekLabel: "Esta semana",
+      themeTitle: "Estilo de jardín",
+      themeHint: "Elegí el estilo de tu jardín. Las salas mantienen su propio estilo.",
+      themes: {
+        zen: "Jardín zen",
+        sky: "Cielo",
+        companion: "Compañero",
+      },
+      themeDesc: {
+        zen: "Surcos en la arena, piedras y musgo que crecen con tus pausas.",
+        sky: "Estrellas que se encienden y un cielo que se profundiza con el día.",
+        companion: "Un compañero de escritorio que se relaja con vos.",
+      },
+      share: "Compartir",
+      download: "Descargar",
+      exportError: "No se pudo exportar la imagen. Probá otra vez.",
+      shareText: "Mi jardín de Calmo hoy — {counts}. calmo.fit",
+      summary: "{breaks} pausas · {exercises} ejercicios · {water} vasos",
+    },
     room: {
       shareTitle: "Foco con amigos",
       shareDesc:

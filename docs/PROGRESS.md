@@ -18,7 +18,7 @@ Three stages. Each stage must end with:
   - [x] 1.2 "Start new day" button + automatic calendar-day reset
   - [x] 1.3 Auto PiP, visual phase-end alert, tab-close warning
 - [x] Stage 2 — Shared focus rooms (verify PASS 2026-10-25)
-- [ ] Stage 3 — Garden with 3 styles
+- [x] Stage 3 — Garden with 3 styles (verify PASS 2026-10-25)
 
 ## Stage 1 verify (2026-10-25)
 
@@ -56,12 +56,14 @@ delete from public.room_events where room_id in (
 delete from public.focus_rooms where code = ANY($1);
 ```
 
-Known codes from local runs (2026-10-25):
+Known codes (2026-10-25):
 
-- `ab4807ea` (first iteration)
-- `025c5ebf`
-- `b2f9b541`
+- `ab4807ea` (first iteration — local)
+- `025c5ebf` (local)
+- `b2f9b541` (local verify)
 - `18774c17` (manual script run)
+- `686449b7` (remote e2e against prod, Stage 2 verify)
+- `f7692a14` (local verify, Stage 3)
 
 ## Garden (Stage 3)
 
