@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
-import { Pause, Play, SkipForward, X } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Leaf, Pause, Play, SkipForward, X } from "lucide-react";
 import { useFocusTimer } from "@/contexts/FocusTimerContext";
 import { useT } from "@/lib/i18n";
 
@@ -14,18 +15,23 @@ export const PipTimerWindow = () => {
     skipToNextPhase,
     closePipWindow,
     formatTime,
+    visualAlertEvent,
   } = useFocusTimer();
   const { t } = useT();
+  const prefersReduced = useReducedMotion();
 
   if (!pipOpen || !pipRoot) return null;
 
   const phaseLabel =
     currentPhase === "work" ? t.app.timer.pip.focusLabel : t.app.timer.pip.restLabel;
   const phaseAccent = currentPhase === "work" ? "bg-primary" : "bg-secondary";
+  const alertLabel = visualAlertEvent?.phase === "work"
+    ? t.app.timer.visualAlert.workComplete
+    : t.app.timer.visualAlert.restComplete;
 
   return createPortal(
     <div
-      className="flex h-screen w-screen flex-col items-center justify-center gap-3 bg-background p-4 text-foreground"
+      className="relative flex h-screen w-screen flex-col items-center justify-center gap-2 bg-background p-3 text-foreground"
       style={{ fontFamily: "inherit" }}
     >
       <div className="flex items-center gap-2">
@@ -70,6 +76,33 @@ export const PipTimerWindow = () => {
           <X className="h-4 w-4" aria-hidden />
         </button>
       </div>
+      <p className="mt-1 px-2 text-center text-[10px] leading-tight text-muted-foreground">
+        {t.app.timer.pip.tabCloseWarning}
+      </p>
+      <AnimatePresence>
+        {visualAlertEvent && (
+          <motion.div
+            key={visualAlertEvent.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReduced ? 0 : 0.2 }}
+            className="absolute inset-0 flex items-center justify-center bg-background"
+            role="status"
+            aria-label={alertLabel}
+          >
+            <motion.div
+              initial={prefersReduced ? { scale: 1 } : { scale: 0.6 }}
+              animate={{ scale: 1 }}
+              exit={prefersReduced ? { scale: 1 } : { scale: 1.1 }}
+              transition={{ duration: prefersReduced ? 0 : 0.4, ease: "easeOut" }}
+              className="flex h-[80%] w-[80%] max-w-[160px] max-h-[160px] items-center justify-center rounded-3xl bg-primary"
+            >
+              <Leaf className="h-[55%] w-[55%] text-primary-foreground" aria-hidden />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>,
     pipRoot,
   );

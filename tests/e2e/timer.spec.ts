@@ -31,7 +31,7 @@ test.describe("Timer visibility", () => {
   });
 
   test("volume setting persists after reload", async ({ page }) => {
-    await openGuestInEnglish(page, "/app/settings");
+    await openGuestInEnglish(page, "/app");
     // Prime the preference and refresh — the hook reads from localStorage at
     // mount. This mirrors what we'd see after the user actually dragged the
     // slider, without poking Radix internals from the test.
@@ -40,7 +40,8 @@ test.describe("Timer visibility", () => {
     await page.waitForSelector("h1", { timeout: 10_000 }).catch(() => {});
     const afterReload = await page.evaluate(() => localStorage.getItem("calmo_timer_volume"));
     expect(afterReload).toBe("40");
-    // The value is rendered in a small readout next to the slider label.
+    // The slider lives inside the collapsible "Timer settings" panel on Home.
+    await page.getByRole("button", { name: /Timer settings/i }).click();
     await expect(page.getByText(/^\s*40\s*$/).first()).toBeVisible({ timeout: 10_000 });
   });
 

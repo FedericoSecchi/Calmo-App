@@ -16,6 +16,7 @@ import { createContext, useContext, useEffect, useState, useRef, ReactNode, useC
 import { useBreakLogs } from "@/hooks/useBreakLogs";
 import { useToast } from "@/hooks/use-toast";
 import { useReminderSettings } from "@/hooks/useReminderSettings";
+import { useManualBreakAdjustments } from "@/hooks/useManualBreakAdjustments";
 import { useAuth } from "@/contexts/AuthContext";
 import { useT, format as fmt } from "@/lib/i18n";
 import { useTimerPrefs, type WarnBeforeSec } from "@/hooks/useTimerPrefs";
@@ -26,9 +27,12 @@ import {
   playCountdownBlip,
 } from "@/lib/timerAudio";
 import { shouldFirePreEndWarning, formatTimerTitle } from "@/lib/timer";
+import { getLocalDayString, shouldAutoResetDay } from "@/lib/dayReset";
 import { track } from "@/lib/analytics";
 
 const TIMER_STORAGE_KEY = "calmo_reminder_timer_state";
+const LAST_ACTIVE_DAY_KEY = "calmo_last_active_day";
+const PIP_FIRST_OPEN_KEY = "calmo_pip_first_open_shown";
 
 export type TimerPhase = "work" | "rest";
 export type PresetId = "light" | "standard" | "focus";
@@ -61,12 +65,9 @@ interface TimerState {
   presetId: PresetId;
 }
 
-interface ScreenBreakState {
-  isOpen: boolean;
-  countdownSeconds: number;
-  lastTriggerWorkElapsed: number;
-  snoozed: boolean;
-  snoozeTargetWorkElapsed: number | null;
+export interface VisualAlertEvent {
+  id: number;
+  phase: TimerPhase;
 }
 
 interface FocusTimerContextType {
@@ -78,6 +79,9 @@ interface FocusTimerContextType {
   soundEnabled: boolean;
   volume: number; // 0..100
   warnBeforeSec: WarnBeforeSec;
+  autoPipEnabled: boolean;
+  visualAlertEnabled: boolean;
+  visualAlertEvent: VisualAlertEvent | null;
   preEndWarning: { visible: boolean; phase: TimerPhase; seconds: number } | null;
   pipSupported: boolean;
   pipOpen: boolean;
@@ -86,6 +90,7 @@ interface FocusTimerContextType {
   showEndOfFocusDialog: boolean; // Flag to show end-of-focus UI when REST completes
   providerId: string; // Unique ID to prove single provider instance
   workElapsedSeconds: number; // Total WORK time elapsed (only increments during WORK phase when running)
+  cyclesToday: number;
   screenBreak: ScreenBreakState;
 
   // Actions
@@ -93,15 +98,19 @@ interface FocusTimerContextType {
   pauseTimer: () => void;
   toggleTimer: () => void;
   skipToNextPhase: () => void;
+  startNewDay: () => void;
   setPreset: (preset: PresetId) => void;
   setCustomTimings: (workMinutes: number, restMinutes: number) => void; // Set custom timings (session-only, doesn't persist)
   setSoundEnabled: (enabled: boolean) => void;
   setVolume: (volume: number) => void;
   setWarnBeforeSec: (sec: number) => void;
+  setAutoPipEnabled: (enabled: boolean) => void;
+  setVisualAlertEnabled: (enabled: boolean) => void;
   playTestSound: () => void;
   openPipWindow: () => Promise<void>;
   closePipWindow: () => void;
   dismissPreEndWarning: () => void;
+  dismissVisualAlert: () => void;
   dismissEndOfFocusDialog: () => void; // Dismiss the end-of-focus dialog
   dismissScreenBreak: () => void; // Dismiss screen break (Listo)
   snoozeScreenBreak: () => void; // Snooze screen break for 5 minutes
@@ -131,7 +140,17 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
   const { t } = useT();
   const { settings, updateSettings } = useReminderSettings();
   const { logBreak } = useBreakLogs();
-  const { volume, setVolume, warnBeforeSec, setWarnBeforeSec } = useTimerPrefs();
+  const { resetToday: resetManualAdjustmentsToday } = useManualBreakAdjustments();
+  const {
+    volume,
+    setVolume,
+    warnBeforeSec,
+    setWarnBeforeSec,
+    autoPip: autoPipEnabled,
+    setAutoPip: setAutoPipEnabled,
+    visualAlert: visualAlertEnabled,
+    setVisualAlert: setVisualAlertEnabled,
+  } = useTimerPrefs();
   
   // Create stable unique ID for this provider instance (proves single provider)
   const getProviderId = () => {
@@ -239,6 +258,40 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     snoozeTargetWorkElapsed: null,
   });
 
+  // Visual alert (full-window logo at end of each phase).
+  const [visualAlertEvent, setVisualAlertEvent] = useState<VisualAlertEvent | null>(null);
+  const visualAlertEnabledRef = useRef(visualAlertEnabled);
+  useEffect(() => {
+    visualAlertEnabledRef.current = visualAlertEnabled;
+  }, [visualAlertEnabled]);
+  const visualAlertIdRef = useRef(0);
+  const visualAlertTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cycle counter (completed WORK→REST→WORK rounds today).
+  const CYCLES_STORAGE_KEY = "calmo_cycles_today";
+  const loadCyclesToday = useCallback((): number => {
+    try {
+      const raw = localStorage.getItem(CYCLES_STORAGE_KEY);
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw) as { day: string; count: number };
+      if (parsed.day !== getLocalDayString()) return 0;
+      return Number.isFinite(parsed.count) ? parsed.count : 0;
+    } catch {
+      return 0;
+    }
+  }, []);
+  const [cyclesToday, setCyclesToday] = useState<number>(() => loadCyclesToday());
+  const persistCycles = useCallback((count: number) => {
+    try {
+      localStorage.setItem(
+        CYCLES_STORAGE_KEY,
+        JSON.stringify({ day: getLocalDayString(), count }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   // Sync with database settings
   useEffect(() => {
     if (settings && !isGuest) {
@@ -301,6 +354,25 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
   const [pipOpen, setPipOpen] = useState(false);
   const [pipRoot, setPipRoot] = useState<HTMLDivElement | null>(null);
 
+  const triggerVisualAlert = useCallback((endedPhase: TimerPhase) => {
+    if (!visualAlertEnabledRef.current) return;
+    visualAlertIdRef.current += 1;
+    const id = visualAlertIdRef.current;
+    setVisualAlertEvent({ id, phase: endedPhase });
+    if (visualAlertTimeoutRef.current) clearTimeout(visualAlertTimeoutRef.current);
+    visualAlertTimeoutRef.current = setTimeout(() => {
+      setVisualAlertEvent((prev) => (prev && prev.id === id ? null : prev));
+    }, 1500);
+  }, []);
+
+  const dismissVisualAlert = useCallback(() => {
+    if (visualAlertTimeoutRef.current) {
+      clearTimeout(visualAlertTimeoutRef.current);
+      visualAlertTimeoutRef.current = null;
+    }
+    setVisualAlertEvent(null);
+  }, []);
+
   // Helper function to trigger notification and sound
   const triggerNotificationAndSound = useCallback(
     (title: string, body: string, isWorkToRest: boolean) => {
@@ -319,8 +391,9 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
           playBreakEndSound(v);
         }
       }
+      triggerVisualAlert(isWorkToRest ? "work" : "rest");
     },
-    [],
+    [triggerVisualAlert],
   );
 
   const lastCountdownSecondRef = useRef<number>(-1);
@@ -516,10 +589,17 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
         if (isFreshTransition) {
           // Log the completed break (counts as habit)
           logBreak("reminder");
-          
+
+          // Count the completed WORK+REST cycle.
+          setCyclesToday((prev) => {
+            const next = prev + 1;
+            persistCycles(next);
+            return next;
+          });
+
           // Show end-of-focus dialog (calm, non-blocking UI)
           setShowEndOfFocusDialog(true);
-          
+
           triggerNotificationAndSound(
             t.app.timer.notifications.breakCompletedTitle,
             t.app.timer.notifications.breakCompletedBody,
@@ -594,23 +674,79 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     }
   }, [currentPhase, isRunning, workElapsedSeconds]);
 
-  // Actions
+  // Actions — the user gesture that starts the timer also powers auto-PiP and
+  // the one-time Notification permission ask. Both only run on explicit
+  // start (not when the timer flips automatically between phases).
+  const openPipWindowRef = useRef<() => Promise<void>>(async () => {});
+  const autoPipEnabledRef = useRef(autoPipEnabled);
+  useEffect(() => {
+    autoPipEnabledRef.current = autoPipEnabled;
+  }, [autoPipEnabled]);
+  const pipOpenRef = useRef(false);
+  useEffect(() => {
+    pipOpenRef.current = pipOpen;
+  }, [pipOpen]);
+
+  const handleUserStartGesture = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (
+        typeof Notification !== "undefined" &&
+        Notification.permission === "default"
+      ) {
+        void Notification.requestPermission().catch(() => {});
+      }
+    } catch {
+      /* ignore */
+    }
+    if (
+      autoPipEnabledRef.current &&
+      pipSupported &&
+      !pipOpenRef.current
+    ) {
+      void openPipWindowRef.current().catch(() => {});
+    }
+  }, [pipSupported]);
+
   const startTimer = useCallback(() => {
+    handleUserStartGesture();
     setIsRunning(true);
-  }, []);
+  }, [handleUserStartGesture]);
 
   const pauseTimer = useCallback(() => {
     setIsRunning(false);
   }, []);
 
   const toggleTimer = useCallback(() => {
-    setIsRunning(prev => !prev);
-  }, []);
+    setIsRunning((prev) => {
+      if (!prev) handleUserStartGesture();
+      return !prev;
+    });
+  }, [handleUserStartGesture]);
 
   const skipToNextPhase = useCallback(() => {
     setIsRunning(false);
     setTimeRemaining(0); // Trigger phase completion
   }, []);
+
+  const startNewDay = useCallback(() => {
+    const config = getPresetConfig(selectedPreset);
+    setIsRunning(false);
+    setCurrentPhase("work");
+    setTimeRemaining(config.workMinutes * 60);
+    setCustomRestMinutes(null);
+    setCyclesToday(0);
+    persistCycles(0);
+    setShowEndOfFocusDialog(false);
+    setPreEndWarning(null);
+    setVisualAlertEvent(null);
+    resetManualAdjustmentsToday();
+    try {
+      localStorage.setItem(LAST_ACTIVE_DAY_KEY, getLocalDayString());
+    } catch {
+      /* ignore */
+    }
+  }, [getPresetConfig, selectedPreset, persistCycles, resetManualAdjustmentsToday]);
 
   const setPreset = useCallback(async (preset: PresetId) => {
     // Prevent preset change while timer is running (defensive guard)
@@ -762,7 +898,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
       const api = (window as unknown as {
         documentPictureInPicture: { requestWindow: (opts: { width: number; height: number }) => Promise<Window> };
       }).documentPictureInPicture;
-      const pipWin = await api.requestWindow({ width: 320, height: 180 });
+      const pipWin = await api.requestWindow({ width: 320, height: 220 });
       // Copy host stylesheets into the PiP document so Calmo styles apply.
       for (const sheet of Array.from(document.styleSheets)) {
         try {
@@ -790,6 +926,19 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
       setPipRoot(root);
       setPipOpen(true);
       track("focus_started", { via: "pip" });
+      try {
+        const firstShown = localStorage.getItem(PIP_FIRST_OPEN_KEY);
+        if (!firstShown) {
+          toast({
+            title: t.app.timer.pip.firstOpenToastTitle,
+            description: t.app.timer.pip.tabCloseWarning,
+            duration: 8000,
+          });
+          localStorage.setItem(PIP_FIRST_OPEN_KEY, "1");
+        }
+      } catch {
+        /* ignore */
+      }
       pipWin.addEventListener("pagehide", () => {
         pipWindowRef.current = null;
         setPipRoot(null);
@@ -798,7 +947,13 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     } catch {
       /* feature failed — leave state unchanged */
     }
-  }, [pipSupported]);
+  }, [pipSupported, toast, t]);
+
+  // Keep the ref in sync so startTimer can call openPipWindow without
+  // ordering issues.
+  useEffect(() => {
+    openPipWindowRef.current = openPipWindow;
+  }, [openPipWindow]);
 
   // Reset pre-end warning tracking on phase change / preset change.
   useEffect(() => {
@@ -853,6 +1008,83 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     };
   }, []);
 
+  // Day-change tracking. We keep the current day fresh in localStorage; when
+  // the day changes while the app is open AND the timer is stopped we auto
+  // reset. The window-focus and visibility handlers cover tab wake-ups.
+  const startNewDayRef = useRef(startNewDay);
+  useEffect(() => {
+    startNewDayRef.current = startNewDay;
+  }, [startNewDay]);
+
+  const isRunningRef = useRef(isRunning);
+  useEffect(() => {
+    isRunningRef.current = isRunning;
+  }, [isRunning]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const current = getLocalDayString();
+    let storedDay: string | null = null;
+    try {
+      storedDay = localStorage.getItem(LAST_ACTIVE_DAY_KEY);
+    } catch {
+      storedDay = null;
+    }
+    if (shouldAutoResetDay({ storedDay, currentDay: current, isRunning: isRunningRef.current })) {
+      startNewDayRef.current();
+    } else {
+      try {
+        localStorage.setItem(LAST_ACTIVE_DAY_KEY, current);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const checkDay = () => {
+      const now = getLocalDayString();
+      let stored: string | null = null;
+      try {
+        stored = localStorage.getItem(LAST_ACTIVE_DAY_KEY);
+      } catch {
+        stored = null;
+      }
+      if (shouldAutoResetDay({ storedDay: stored, currentDay: now, isRunning: isRunningRef.current })) {
+        startNewDayRef.current();
+      } else {
+        try {
+          localStorage.setItem(LAST_ACTIVE_DAY_KEY, now);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+
+    const onVisibility = () => {
+      if (!document.hidden) checkDay();
+    };
+    const intervalId = window.setInterval(checkDay, 60_000);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", checkDay);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", checkDay);
+    };
+  }, []);
+
+  // beforeunload safety net while the timer is running — the browser shows
+  // its own generic prompt (cannot be customized).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isRunning) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isRunning]);
+
   const value: FocusTimerContextType = {
     currentPhase,
     timeRemaining,
@@ -861,6 +1093,9 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     soundEnabled,
     volume,
     warnBeforeSec,
+    autoPipEnabled,
+    visualAlertEnabled,
+    visualAlertEvent,
     preEndWarning,
     pipSupported,
     pipOpen,
@@ -869,20 +1104,25 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     showEndOfFocusDialog,
     providerId,
     workElapsedSeconds,
+    cyclesToday,
     screenBreak,
     startTimer,
     pauseTimer,
     toggleTimer,
     skipToNextPhase,
+    startNewDay,
     setPreset,
     setCustomTimings,
     setSoundEnabled,
     setVolume,
     setWarnBeforeSec,
+    setAutoPipEnabled,
+    setVisualAlertEnabled,
     playTestSound,
     openPipWindow,
     closePipWindow,
     dismissPreEndWarning,
+    dismissVisualAlert,
     dismissEndOfFocusDialog,
     dismissScreenBreak,
     snoozeScreenBreak,

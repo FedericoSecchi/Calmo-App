@@ -63,7 +63,6 @@ test.describe("App is bilingual (EN mode leaks no hardcoded Spanish)", () => {
     await openGuestInEnglish(page);
     await assertNoSpanish(page, "/app");
     await assertNoSpanish(page, "/app/exercises");
-    await assertNoSpanish(page, "/app/reminders");
     await assertNoSpanish(page, "/app/pain");
     await assertNoSpanish(page, "/app/settings");
     await assertNoSpanish(page, "/onboarding");

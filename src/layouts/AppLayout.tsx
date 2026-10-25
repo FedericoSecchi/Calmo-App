@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { Home, Dumbbell, Activity, Settings, Play, Pause } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { EndOfFocusDialog } from "@/components/EndOfFocusDialog";
 import { ScreenBreakBanner } from "@/components/ScreenBreakBanner";
 import { PreEndWarningBanner } from "@/components/PreEndWarningBanner";
 import { PipTimerWindow } from "@/components/PipTimerWindow";
+import { VisualAlertOverlay } from "@/components/VisualAlertOverlay";
 import { AppBackground } from "@/components/AppBackground";
 import { Footer } from "@/components/Footer";
 import { useFocusTimer } from "@/contexts/FocusTimerContext";
@@ -14,7 +15,6 @@ import { useT, format } from "@/lib/i18n";
 
 const AppLayout = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const { isGuest, user } = useAuth();
   const { t } = useT();
 
@@ -55,6 +55,7 @@ const AppLayout = () => {
         <ScreenBreakBanner />
         <PreEndWarningBanner />
         <PipTimerWindow />
+        <VisualAlertOverlay />
         <div
           className="fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-40 flex items-center justify-between px-4"
           style={{ paddingTop: "env(safe-area-inset-top)" }}
@@ -92,10 +93,7 @@ const AppLayout = () => {
                   <div key="fab-slot" className="relative flex items-center justify-center h-full">
                     <div className="absolute -top-6 z-10">
                       <button
-                        onClick={() => {
-                          toggleTimer();
-                          navigate("/app/reminders");
-                        }}
+                        onClick={toggleTimer}
                         className={cn(
                           "flex flex-col items-center justify-center",
                           "w-16 h-16 rounded-full min-w-[44px] min-h-[44px]",

@@ -5,7 +5,6 @@ import { FocusTimerProvider } from "@/contexts/FocusTimerContext";
 import AppLayout from "./AppLayout";
 
 const Dashboard = lazy(() => import("@/pages/app/Dashboard"));
-const Reminders = lazy(() => import("@/pages/app/Reminders"));
 const Exercises = lazy(() => import("@/pages/app/Exercises"));
 const Pain = lazy(() => import("@/pages/app/Pain"));
 const Settings = lazy(() => import("@/pages/app/Settings"));
@@ -38,7 +37,7 @@ export default function AppRoutes() {
         <Routes>
           <Route element={<AppLayout />}>
             <Route index element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
-            <Route path="reminders" element={<Suspense fallback={<PageFallback />}><Reminders /></Suspense>} />
+            <Route path="reminders" element={<Navigate to="/app" replace />} />
             <Route path="exercises" element={<Suspense fallback={<PageFallback />}><Exercises /></Suspense>} />
             <Route path="pain" element={<Suspense fallback={<PageFallback />}><Pain /></Suspense>} />
             <Route path="settings" element={<Suspense fallback={<PageFallback />}><Settings /></Suspense>} />
