@@ -23,7 +23,7 @@ import {
   RotateCcw,
   Check,
 } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useWaterLogs } from "@/hooks/useWaterLogs";
 import { useManualBreakAdjustments } from "@/hooks/useManualBreakAdjustments";
@@ -31,12 +31,12 @@ import { useExerciseCompletions } from "@/hooks/useExerciseCompletions";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFocusTimer, presets, type PresetId } from "@/contexts/FocusTimerContext";
-import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { track } from "@/lib/analytics";
-import { Users as UsersIcon } from "lucide-react";
+import { useAppTimer } from "@/hooks/useAppTimer";
+import { useActiveRoom } from "@/contexts/ActiveRoomContext";
 import { GardenCard } from "@/components/garden/GardenCard";
 import { useGardenTheme } from "@/hooks/useGardenTheme";
 import type { GardenTheme } from "@/lib/garden/engine";
+import { MyRoomsCard } from "@/components/MyRoomsCard";
 import { getTodayCount, getWeekCount } from "@/lib/stats";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -58,7 +58,6 @@ const WATER_GOAL = 8;
 const Dashboard = () => {
   const { toast } = useToast();
   const { t } = useT();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isGuest, user } = useAuth();
   const d = t.app.dashboard;
@@ -89,13 +88,8 @@ const Dashboard = () => {
   const { addWaterGlass, removeWaterGlass, isAdding: isAddingWater } = useWaterLogs();
   const { adjustToday } = useManualBreakAdjustments();
   const {
-    isRunning,
-    timeRemaining,
-    currentPhase,
+    isRunning: personalIsRunning,
     selectedPreset,
-    formatTime,
-    toggleTimer,
-    skipToNextPhase,
     pipSupported,
     pipOpen,
     openPipWindow,
@@ -115,6 +109,14 @@ const Dashboard = () => {
     playTestSound,
     startNewDay,
   } = useFocusTimer();
+  const appTimer = useAppTimer();
+  const activeRoomCtx = useActiveRoom();
+  const isRunning = appTimer.isRunning;
+  const timeRemaining = appTimer.remainingSec;
+  const currentPhase = appTimer.phaseLabel;
+  const formatTime = appTimer.formatTime;
+  const toggleTimer = appTimer.toggle;
+  const skipToNextPhase = appTimer.skip;
 
   const currentPresetName = t.app.presets[selectedPreset].name;
 
@@ -149,7 +151,7 @@ const Dashboard = () => {
   };
 
   const handlePresetChange = async (preset: PresetId) => {
-    if (isRunning) return;
+    if (personalIsRunning) return;
     try {
       await setPreset(preset);
       toast({
@@ -164,7 +166,7 @@ const Dashboard = () => {
   };
 
   const handleCustomTimings = () => {
-    if (isRunning) return;
+    if (personalIsRunning) return;
     if (customWorkMinutes < 1 || customRestMinutes < 1) {
       toast({ title: s.invalidValues, description: s.invalidValuesDesc, variant: "destructive" });
       return;
@@ -202,53 +204,28 @@ const Dashboard = () => {
     toast({ title: d.toasts.newDayTitle, description: d.toasts.newDayDesc });
   };
 
-  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
-
-  const createRoom = async () => {
-    if (!isSupabaseConfigured) {
-      toast({ title: roomT.createError, variant: "destructive" });
-      return;
-    }
-    setIsCreatingRoom(true);
-    try {
-      const { data, error } = await supabase.rpc("create_focus_room", { p_theme: "zen" });
-      if (error || typeof data !== "string") {
-        toast({ title: roomT.createError, variant: "destructive" });
-        setIsCreatingRoom(false);
-        return;
-      }
-      track("room_created", { code: data });
-      navigate(`/app/room/${data}`);
-    } catch {
-      toast({ title: roomT.createError, variant: "destructive" });
-      setIsCreatingRoom(false);
-    }
-  };
-
-  const handleCreateRoomClick = () => {
-    if (isGuest || !user) {
-      navigate("/auth?mode=signup&create_room=1");
-      return;
-    }
-    void createRoom();
-  };
-
-  // Honor ?create_room=1 flag coming back from auth.
+  // Honor ?create_room=1 flag coming back from auth: open the create flow
+  // automatically. MyRoomsCard listens for this hash signal.
   useEffect(() => {
     if (searchParams.get("create_room") !== "1") return;
     if (isGuest || !user) return;
     const next = new URLSearchParams(searchParams);
     next.delete("create_room");
     setSearchParams(next, { replace: true });
-    void createRoom();
+    window.dispatchEvent(new CustomEvent("calmo:openCreateRoom"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGuest, user]);
 
   const phaseLabel = currentPhase === "rest" ? d.phase.rest : isRunning ? d.phase.inFocus : d.phase.paused;
-  const presetSubline = format(d.presetSubline, {
-    presetName: currentPresetName,
-    phaseLabel: currentPhase === "work" ? d.phaseLabel.work : d.phaseLabel.rest,
-  });
+  const roomTimerName =
+    activeRoomCtx.activeRoom?.name?.trim() || activeRoomCtx.info?.name?.trim() || activeRoomCtx.activeRoom?.code;
+  const presetSubline =
+    appTimer.source === "room"
+      ? `${roomT.title} · ${roomTimerName ?? ""}`
+      : format(d.presetSubline, {
+          presetName: currentPresetName,
+          phaseLabel: currentPhase === "work" ? d.phaseLabel.work : d.phaseLabel.rest,
+        });
   const skipAria = currentPhase === "work" ? d.skipToRestAria : d.skipRestAria;
 
   return (
@@ -398,12 +375,12 @@ const Dashboard = () => {
                       <button
                         key={preset.id}
                         onClick={() => handlePresetChange(preset.id)}
-                        disabled={isRunning}
+                        disabled={personalIsRunning}
                         className={`w-full p-3 rounded-xl border-2 transition-all flex items-center justify-between text-left ${
                           selectedPreset === preset.id
                             ? "border-primary bg-primary/5"
                             : "border-border bg-background hover:border-border/80"
-                        } ${isRunning ? "opacity-50 cursor-not-allowed" : ""}`}
+                        } ${personalIsRunning ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
                         <div>
                           <p className="font-medium text-foreground">
@@ -419,7 +396,7 @@ const Dashboard = () => {
                       </button>
                     ))}
                   </div>
-                  {isRunning && (
+                  {personalIsRunning && (
                     <p className="mt-3 text-xs text-muted-foreground">
                       {s.changeWhilePausedHint}
                     </p>
@@ -428,9 +405,9 @@ const Dashboard = () => {
                   <button
                     type="button"
                     onClick={() => setAdvancedOpen((o) => !o)}
-                    disabled={isRunning}
+                    disabled={personalIsRunning}
                     className={`mt-3 w-full flex items-center justify-between p-2 rounded-lg border border-border/40 text-xs text-muted-foreground transition ${
-                      isRunning ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/40"
+                      personalIsRunning ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/40"
                     }`}
                   >
                     <span>{s.advanced}</span>
@@ -441,7 +418,7 @@ const Dashboard = () => {
                     )}
                   </button>
                   <AnimatePresence>
-                    {advancedOpen && !isRunning && (
+                    {advancedOpen && !personalIsRunning && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
@@ -848,26 +825,8 @@ const Dashboard = () => {
         transition={{ duration: 0.4, delay: 0.22 }}
       >
         <h2 className="font-heading text-base text-foreground mb-3">{d.actions}</h2>
-        <div className="flex flex-col gap-2">
-          <Button
-            variant="outline"
-            size="lg"
-            className="justify-start h-auto py-3 whitespace-normal"
-            onClick={handleCreateRoomClick}
-            disabled={isCreatingRoom}
-          >
-            {isCreatingRoom ? (
-              <Loader2 className="h-5 w-5 mr-3 text-primary animate-spin shrink-0" />
-            ) : (
-              <UsersIcon className="h-5 w-5 mr-3 text-primary shrink-0" />
-            )}
-            <div className="text-left min-w-0 flex-1">
-              <p className="font-medium text-sm">{roomT.shareTitle}</p>
-              <p className="text-xs text-muted-foreground whitespace-normal break-words">
-                {isGuest ? roomT.createNeedsAccount : roomT.shareDesc}
-              </p>
-            </div>
-          </Button>
+        <div className="flex flex-col gap-3">
+          <MyRoomsCard />
 
           <Button variant="outline" size="lg" className="justify-start h-auto py-3 whitespace-normal" asChild>
             <Link to="/app/pain">

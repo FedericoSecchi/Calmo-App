@@ -50,6 +50,23 @@ export interface RoomInfo {
   breakCount: number;
   exerciseCount: number;
   waterCount: number;
+  name: string | null;
+  isOwner: boolean;
+}
+
+export interface RoomMeta {
+  code: string;
+  name: string | null;
+  isOwner: boolean;
+  lastActiveAt: string;
+}
+
+export interface MyRoom {
+  code: string;
+  name: string | null;
+  gardenTheme: "zen" | "sky" | "companion";
+  createdAt: string;
+  lastActiveAt: string;
 }
 
 export interface RoomPresence {
@@ -59,6 +76,51 @@ export interface RoomPresence {
 }
 
 export type RoomStatus = "loading" | "ready" | "not_found" | "realtime_error";
+
+export async function fetchRoomMeta(code: string): Promise<RoomMeta | null> {
+  if (!isSupabaseConfigured) return null;
+  const { data, error } = await supabase.rpc("get_focus_room_meta", { p_code: code });
+  if (error || !data) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    code: row.code,
+    name: row.name ?? null,
+    isOwner: !!row.is_owner,
+    lastActiveAt: row.last_active_at,
+  };
+}
+
+export async function listMyRooms(): Promise<MyRoom[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase.rpc("list_my_rooms");
+  if (error || !Array.isArray(data)) return [];
+  return data.map((row) => ({
+    code: row.code,
+    name: row.name ?? null,
+    gardenTheme: row.garden_theme,
+    createdAt: row.created_at,
+    lastActiveAt: row.last_active_at,
+  }));
+}
+
+export async function renameRoom(code: string, name: string | null): Promise<boolean> {
+  if (!isSupabaseConfigured) return false;
+  const payload = { p_code: code, p_name: name };
+  const { error } = await supabase.rpc("rename_focus_room", payload);
+  return !error;
+}
+
+export async function createRoomWithName(theme: "zen" | "sky" | "companion", name: string | null): Promise<string | null> {
+  if (!isSupabaseConfigured) return null;
+  const { data, error } = await supabase.rpc("create_focus_room", { p_theme: theme });
+  if (error || typeof data !== "string") return null;
+  const code = data;
+  if (name && name.trim()) {
+    await renameRoom(code, name.trim());
+  }
+  return code;
+}
 
 interface Broadcast {
   state: { payload: RoomTimerState };
@@ -224,6 +286,7 @@ export function useFocusRoom(
     if (error || !data) return;
     const row = Array.isArray(data) ? data[0] : data;
     if (!row) return;
+    const meta = await fetchRoomMeta(code);
     setInfo({
       code: row.code,
       gardenTheme: row.garden_theme,
@@ -232,6 +295,8 @@ export function useFocusRoom(
       breakCount: row.break_count ?? 0,
       exerciseCount: row.exercise_count ?? 0,
       waterCount: row.water_count ?? 0,
+      name: meta?.name ?? null,
+      isOwner: meta?.isOwner ?? false,
     });
   }, [code]);
   useEffect(() => {
@@ -258,6 +323,8 @@ export function useFocusRoom(
         setStatus("not_found");
         return;
       }
+      const meta = await fetchRoomMeta(code);
+      if (cancelled) return;
       setInfo({
         code: row.code,
         gardenTheme: row.garden_theme,
@@ -266,6 +333,8 @@ export function useFocusRoom(
         breakCount: row.break_count ?? 0,
         exerciseCount: row.exercise_count ?? 0,
         waterCount: row.water_count ?? 0,
+        name: meta?.name ?? null,
+        isOwner: meta?.isOwner ?? false,
       });
       setStatus("ready");
     })();
@@ -412,6 +481,18 @@ export function useFocusRoom(
     }
   }, [remainingSec, broadcastState, code]);
 
+  const rename = useCallback(
+    async (name: string | null): Promise<boolean> => {
+      if (!code) return false;
+      const ok = await renameRoom(code, name);
+      if (ok) {
+        setInfo((prev) => (prev ? { ...prev, name } : prev));
+      }
+      return ok;
+    },
+    [code],
+  );
+
   return {
     status,
     info,
@@ -425,5 +506,6 @@ export function useFocusRoom(
     setRhythm,
     logActivity,
     refreshCounts,
+    rename,
   };
 }

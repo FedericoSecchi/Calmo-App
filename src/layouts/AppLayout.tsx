@@ -11,6 +11,9 @@ import { VisualAlertOverlay } from "@/components/VisualAlertOverlay";
 import { AppBackground } from "@/components/AppBackground";
 import { Footer } from "@/components/Footer";
 import { useFocusTimer } from "@/contexts/FocusTimerContext";
+import { useAppTimer } from "@/hooks/useAppTimer";
+import { useActiveRoom } from "@/contexts/ActiveRoomContext";
+import { ActiveRoomStrip } from "@/components/ActiveRoomStrip";
 import { useT, format } from "@/lib/i18n";
 
 const AppLayout = () => {
@@ -21,12 +24,14 @@ const AppLayout = () => {
   const {
     showEndOfFocusDialog,
     dismissEndOfFocusDialog,
-    isRunning,
-    timeRemaining,
-    formatTime,
-    toggleTimer,
-    currentPhase,
   } = useFocusTimer();
+  const appTimer = useAppTimer();
+  const { activeRoom } = useActiveRoom();
+  const isRunning = appTimer.isRunning;
+  const timeRemaining = appTimer.remainingSec;
+  const formatTime = appTimer.formatTime;
+  const toggleTimer = appTimer.toggle;
+  const currentPhase = appTimer.phaseLabel;
 
   const getUserInitials = () => {
     if (!user?.email) return "U";
@@ -69,6 +74,8 @@ const AppLayout = () => {
           </NavLink>
         </div>
 
+        <ActiveRoomStrip />
+
         <main className="flex flex-col">
           {isGuest && (
             <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center">
@@ -76,7 +83,7 @@ const AppLayout = () => {
             </div>
           )}
 
-          <div className="pt-16 pb-24 flex-1">
+          <div className={`${activeRoom ? "pt-24" : "pt-16"} pb-24 flex-1`}>
             <Outlet />
           </div>
           <Footer variant="minimal" />

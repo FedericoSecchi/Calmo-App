@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { FocusTimerProvider } from "@/contexts/FocusTimerContext";
+import { ActiveRoomProvider } from "@/contexts/ActiveRoomContext";
 import AppLayout from "./AppLayout";
 
 const Dashboard = lazy(() => import("@/pages/app/Dashboard"));
@@ -55,16 +56,18 @@ export default function AppRoutes() {
   return (
     <ProtectedRoute>
       <FocusTimerProvider>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route index element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
-            <Route path="reminders" element={<Navigate to="/app" replace />} />
-            <Route path="exercises" element={<Suspense fallback={<PageFallback />}><Exercises /></Suspense>} />
-            <Route path="pain" element={<Suspense fallback={<PageFallback />}><Pain /></Suspense>} />
-            <Route path="settings" element={<Suspense fallback={<PageFallback />}><Settings /></Suspense>} />
-            <Route path="room/:code" element={<Suspense fallback={<PageFallback />}><Room /></Suspense>} />
-          </Route>
-        </Routes>
+        <ActiveRoomProvider>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route index element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
+              <Route path="reminders" element={<Navigate to="/app" replace />} />
+              <Route path="exercises" element={<Suspense fallback={<PageFallback />}><Exercises /></Suspense>} />
+              <Route path="pain" element={<Suspense fallback={<PageFallback />}><Pain /></Suspense>} />
+              <Route path="settings" element={<Suspense fallback={<PageFallback />}><Settings /></Suspense>} />
+              <Route path="room/:code" element={<Suspense fallback={<PageFallback />}><Room /></Suspense>} />
+            </Route>
+          </Routes>
+        </ActiveRoomProvider>
       </FocusTimerProvider>
     </ProtectedRoute>
   );

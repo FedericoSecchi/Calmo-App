@@ -52,7 +52,18 @@ export default defineConfig({
         background_color: "#F3EBDD",
         display: "standalone",
         orientation: "portrait-primary",
-        start_url: "/",
+        // Installed app lands straight into /app. ProtectedRoute still bounces
+        // signed-out visitors to /auth, so the UX for first-time launches
+        // remains sensible.
+        start_url: "/app",
+        scope: "/",
+        // Reopen an existing window instead of spawning new ones when the OS
+        // launches the app from a link (Chromium ≥102).
+        launch_handler: { client_mode: "navigate-existing" },
+        // Hint to the OS that calmo.fit links should prefer the installed
+        // PWA. Chromium 92+ honors this; Safari/iOS and Firefox/Android
+        // ignore it today (see docs/PROGRESS.md "Pending" for the matrix).
+        handle_links: "preferred",
         icons: [
           {
             src: "/icon-192.png",

@@ -12,36 +12,32 @@ import {
   Activity,
   Loader2,
   Home,
+  Pencil,
+  DoorOpen,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useFocusRoom, ROOM_RHYTHMS, type RoomRhythmId } from "@/hooks/useFocusRoom";
+import { ROOM_RHYTHMS, type RoomRhythmId } from "@/hooks/useFocusRoom";
 import { useT, format } from "@/lib/i18n";
 import { track } from "@/lib/analytics";
 import { GardenCard } from "@/components/garden/GardenCard";
 import type { GardenTheme } from "@/lib/garden/engine";
 import { useFocusTimer, type PresetId } from "@/contexts/FocusTimerContext";
 import { JOIN_PATHS } from "@/lib/i18n/types";
-
-const ROOM_NAME_KEY = "calmo_room_name";
-
-const readStoredName = (): string => {
-  if (typeof window === "undefined") return "";
-  try {
-    return window.localStorage.getItem(ROOM_NAME_KEY) ?? "";
-  } catch {
-    return "";
-  }
-};
-
-const writeStoredName = (value: string) => {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(ROOM_NAME_KEY, value);
-  } catch {
-    /* ignore */
-  }
-};
+import { useActiveRoom } from "@/contexts/ActiveRoomContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { readNickname, writeNickname } from "@/lib/activeRoomStorage";
 
 const formatMMSS = (seconds: number): string => {
   const mins = Math.floor(Math.max(0, seconds) / 60);
@@ -90,18 +86,18 @@ const NameEntry = ({
 
 interface RoomViewProps {
   code: string;
-  name: string;
   onChangeName: () => void;
 }
 
-const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
+const RoomView = ({ code, onChangeName }: RoomViewProps) => {
   const { t, lang } = useT();
   const r = t.app.room;
   const { toast } = useToast();
   const { selectedPreset } = useFocusTimer();
+  const active = useActiveRoom();
 
   const {
-    status,
+    activeRoom,
     info,
     presence,
     state,
@@ -112,14 +108,35 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
     skip,
     setRhythm,
     logActivity,
-  } = useFocusRoom(code, name, { initialRhythmId: selectedPreset as PresetId });
+    rename,
+    leaveActiveRoom,
+  } = active;
+
+  // Ensure the active-room slot is set to this URL. Also seed the room's
+  // rhythm from the user's personal preset the first time around.
+  useEffect(() => {
+    if (!activeRoom || activeRoom.code !== code) {
+      active.setActiveRoom({ code, nickname: readNickname() });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, activeRoom?.code]);
+
+  // Prime the broadcast state's rhythm the first time this room is new.
+  const primedRef = useRef(false);
+  useEffect(() => {
+    if (primedRef.current) return;
+    if (!state) return;
+    if (state.updatedAt > 0) return; // somebody already set rhythm
+    primedRef.current = true;
+    setRhythm(selectedPreset as RoomRhythmId);
+  }, [state, selectedPreset, setRhythm]);
 
   const trackedJoinRef = useRef(false);
   useEffect(() => {
-    if (status !== "ready" || trackedJoinRef.current) return;
+    if (!activeRoom || trackedJoinRef.current) return;
     trackedJoinRef.current = true;
     track("room_joined", { code });
-  }, [code, status]);
+  }, [code, activeRoom]);
 
   const shareUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -158,7 +175,31 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
     await handleCopyLink();
   };
 
-  if (status === "loading") {
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  useEffect(() => {
+    setRenameValue(info?.name ?? "");
+  }, [info?.name]);
+  const [renaming, setRenaming] = useState(false);
+  const navigate = useNavigate();
+
+  const handleRename = async () => {
+    setRenaming(true);
+    const ok = await rename(renameValue.trim() || null);
+    setRenaming(false);
+    if (ok) {
+      setRenameOpen(false);
+    } else {
+      toast({ title: r.createError, variant: "destructive" });
+    }
+  };
+
+  const handleLeave = () => {
+    leaveActiveRoom();
+    navigate("/app");
+  };
+
+  if (!activeRoom) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -166,24 +207,17 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
     );
   }
 
-  if (status === "not_found") {
+  if (!state) {
     return (
-      <div className="p-6 max-w-md mx-auto text-center space-y-4">
-        <h1 className="font-heading text-xl text-foreground">{r.notFound}</h1>
-        <p className="text-sm text-muted-foreground">{r.notFoundDesc}</p>
-        <Button asChild variant="outline">
-          <Link to="/app">
-            <Home className="h-4 w-4 mr-2" />
-            {r.back}
-          </Link>
-        </Button>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   const isRunning = state.isRunning;
   const phaseLabel = state.phase === "focus" ? r.cycleFocus : r.cycleBreak;
-  const realtimeError = status === "realtime_error";
+  const displayName = info?.name?.trim() || activeRoom.name?.trim() || code;
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-[520px] mx-auto">
@@ -191,19 +225,60 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="mb-5"
+        className="mb-5 flex items-start justify-between gap-2"
       >
-        <h1 className="font-heading text-2xl text-foreground">{r.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {r.code}: <span className="font-mono text-foreground">{code}</span>
-        </p>
-      </motion.div>
-
-      {realtimeError && (
-        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-400">
-          {r.realtimeError}
+        <div className="min-w-0 flex-1">
+          <h1 className="font-heading text-2xl text-foreground truncate">{displayName}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {r.code}: <span className="font-mono text-foreground">{code}</span>
+          </p>
         </div>
-      )}
+        {info?.isOwner && (
+          <AlertDialog open={renameOpen} onOpenChange={setRenameOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" data-testid="room-rename-open">
+                <Pencil className="h-4 w-4 mr-1" />
+                {r.renameEdit}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{r.renameTitle}</AlertDialogTitle>
+                <AlertDialogDescription>{r.renamePlaceholder}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <input
+                type="text"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder={r.renamePlaceholder}
+                maxLength={40}
+                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground"
+                data-testid="room-rename-input"
+                autoFocus
+              />
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t.app.dashboard.newDayCancel}</AlertDialogCancel>
+                <AlertDialogAction asChild>
+                  <Button
+                    onClick={handleRename}
+                    disabled={renaming}
+                    data-testid="room-rename-submit"
+                  >
+                    {renaming ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4 mr-1" />
+                        {r.renameSave}
+                      </>
+                    )}
+                  </Button>
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
@@ -257,7 +332,7 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
             {r.rhythmLabel}
           </p>
           <div className="grid grid-cols-3 gap-2">
-            {(Object.values(ROOM_RHYTHMS)).map((rhythm) => {
+            {Object.values(ROOM_RHYTHMS).map((rhythm) => {
               const isActive = state.rhythmId === rhythm.id;
               return (
                 <button
@@ -371,13 +446,31 @@ const RoomView = ({ code, name, onChangeName }: RoomViewProps) => {
         </div>
       </motion.section>
 
-      <div className="mt-6 text-center">
+      <div className="mt-6 flex items-center justify-between gap-2">
         <Button asChild variant="ghost" size="sm">
           <Link to="/app">
             <Home className="h-4 w-4 mr-2" />
             {r.back}
           </Link>
         </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" size="sm" data-testid="room-leave">
+              <DoorOpen className="h-4 w-4 mr-2" />
+              {r.leaveConfirmCta}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{r.leaveConfirmTitle}</AlertDialogTitle>
+              <AlertDialogDescription>{r.leaveConfirmBody}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t.app.dashboard.newDayCancel}</AlertDialogCancel>
+              <AlertDialogAction onClick={handleLeave}>{r.leaveConfirmCta}</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
@@ -387,7 +480,18 @@ const Room = () => {
   const { code } = useParams<{ code: string }>();
   const { t } = useT();
   const r = t.app.room;
-  const [name, setName] = useState<string>(() => readStoredName());
+  const active = useActiveRoom();
+  const [name, setName] = useState<string>(() => readNickname());
+
+  // Persist the active room as early as possible so the strip survives a hard
+  // reload (and tests don't race the useEffect fired from inside RoomView).
+  useEffect(() => {
+    if (!code) return;
+    if (!name.trim()) return;
+    if (active.activeRoom?.code === code && (active.activeRoom?.nickname ?? "") === name.trim()) return;
+    active.setActiveRoom({ code, nickname: name.trim() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, name]);
 
   if (!code) {
     return <div className="p-6 text-center text-muted-foreground">{r.notFound}</div>;
@@ -398,7 +502,7 @@ const Room = () => {
       <NameEntry
         initialValue=""
         onSubmit={(value) => {
-          writeStoredName(value);
+          writeNickname(value);
           setName(value);
         }}
       />
@@ -408,9 +512,8 @@ const Room = () => {
   return (
     <RoomView
       code={code}
-      name={name}
       onChangeName={() => {
-        writeStoredName("");
+        writeNickname("");
         setName("");
       }}
     />

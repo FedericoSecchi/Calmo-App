@@ -27,6 +27,7 @@ import {
   playCountdownBlip,
 } from "@/lib/timerAudio";
 import { shouldFirePreEndWarning, formatTimerTitle } from "@/lib/timer";
+import { isPersonalTimerSuppressed } from "@/lib/timerSuppress";
 import { getLocalDayString, shouldAutoResetDay } from "@/lib/dayReset";
 import { track } from "@/lib/analytics";
 
@@ -975,9 +976,12 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPhase, selectedPreset, customRestMinutes]);
 
-  // Tab title countdown while the timer is running.
+  // Tab title countdown while the timer is running. Suppressed when the
+  // ActiveRoomProvider is driving the user's one visible timer — in that
+  // case the room provider owns `document.title`.
   useEffect(() => {
     if (typeof document === "undefined") return;
+    if (isPersonalTimerSuppressed()) return;
     const defaultTitle = `${t.meta.siteName} — ${t.meta.tagline}`;
     if (!isRunning) {
       document.title = defaultTitle;

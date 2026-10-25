@@ -92,8 +92,26 @@ Visual-review fixes across the whole stack. Highlights:
 - `b6f96db7` (local verify run #3 — final PASS at 98/100/100/100; cascade-delete verified)
 - `1d2a18d6` (remote e2e against prod — polish-pass verify PASS, build-id af22c4f)
 
+## Rooms as a state (2026-10-25 pass 2)
+
+- `supabase/migrations/007_room_names_and_my_rooms.sql` documents the live schema (already applied via Claude.ai): `focus_rooms.name`, `rename_focus_room`, `get_focus_room_meta`, `list_my_rooms`, and the FK swap to `ON DELETE CASCADE` for both `focus_rooms.created_by` and `room_events.room_id` so account deletes cascade their rooms (no more orphan e2e rooms).
+- New global `ActiveRoomContext` wires an "active room" slot per-browser (localStorage key `calmo_active_room`). It's a single source of truth across every `/app` surface:
+  - a thin fixed strip "En sala: <name> · <n> personas · Abrir · Salir" renders on every /app route except the room page itself;
+  - the Dashboard timer card, the center FAB, the tab title and the PiP window all pull from `useAppTimer()`, which routes to the room's shared timer when a room is active and to the personal pomodoro otherwise;
+  - when a room becomes active, the personal timer auto-pauses and PiP closes so the user never sees two timers.
+- Dashboard's "Foco con amigos" is replaced by `MyRoomsCard` showing: "Volver a <name>" (when active), a merged list of `list_my_rooms()` + locally-visited rooms (dedup by code, newest-first, max 10), per-room Entrar/Copiar link/Renombrar (owner-only), and a "Crear sala nueva" dialog with an optional name (default "Sala de &lt;nickname&gt;").
+- Room page now reads from the shared context, lets the owner rename inline, and ships a confirm-protected "Salir de la sala" that clears only the local slot — the room keeps running for everyone else.
+- PWA: `start_url` → `/app`, `launch_handler.client_mode: "navigate-existing"`, `handle_links: "preferred"`. Chromium ≥92/≥102 honors these; Safari/iOS and Firefox/Android ignore both fields today (manifest still parses). `/join/?c=<code>` already handles the SPA redirect so the installed app lands directly in the room.
+- `tests/e2e/active-room.spec.ts` covers the four flows the user asked for: link join + reconnect across a fresh browser context, Mis salas list + rename for the owner, center button pausing the room timer in <2 s on another browser, and invitee not seeing the rename button + strip-Leave clearing the active room. Rooms created by this spec cascade-delete with the account.
+- `verify.sh`: PASS on all steps including Lighthouse mobile. Perf on cold-after-e2e runs dipped from 98 → 97 on both landings (JS +~300 B gzip from the extra i18n keys for the room UX); warm standalone runs still hit 98 reliably. Threshold stays at 95.
+
+### Rooms-as-state room codes (2026-10-25)
+
+- (fill in after remote verify)
+
 ## Pending / manual review
 
 - Visual QA of garden styles.
 - PiP window on real browser (Chromium) — e2e only feature-detects.
 - Two-browser room sync test (manual).
+- PWA link capture matrix: Chromium 92+ (`handle_links: "preferred"`) and 102+ (`launch_handler.client_mode: "navigate-existing"`) → calmo.fit links open the installed PWA (after user approval). Safari/iOS 17+ ignores both fields and still opens Safari; the user has to invoke the PWA manually. Firefox Android ignores both; opens the browser tab. Documented so no surprises when the owner installs the app on different platforms.

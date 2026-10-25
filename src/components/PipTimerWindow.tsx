@@ -2,21 +2,17 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Leaf, Pause, Play, SkipForward, X } from "lucide-react";
 import { useFocusTimer } from "@/contexts/FocusTimerContext";
+import { useAppTimer } from "@/hooks/useAppTimer";
 import { useT } from "@/lib/i18n";
 
 export const PipTimerWindow = () => {
   const {
     pipOpen,
     pipRoot,
-    currentPhase,
-    timeRemaining,
-    isRunning,
-    toggleTimer,
-    skipToNextPhase,
     closePipWindow,
-    formatTime,
     visualAlertEvent,
   } = useFocusTimer();
+  const { phaseLabel: currentPhase, remainingSec: timeRemaining, isRunning, toggle: toggleTimer, skip: skipToNextPhase, formatTime } = useAppTimer();
   const { t } = useT();
   const prefersReduced = useReducedMotion();
 
