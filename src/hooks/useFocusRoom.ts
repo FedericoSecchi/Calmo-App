@@ -1,0 +1,365 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
+
+export const ROOM_FOCUS_SEC = 25 * 60;
+export const ROOM_BREAK_SEC = 5 * 60;
+
+export type RoomPhase = "focus" | "break";
+
+export interface RoomTimerState {
+  phase: RoomPhase;
+  isRunning: boolean;
+  phaseStartAt: number; // ms epoch; while running, phase elapsed = now - phaseStartAt
+  durationSec: number;
+  pausedRemainingSec: number; // meaningful only when !isRunning
+  updatedAt: number;
+}
+
+export interface RoomInfo {
+  code: string;
+  gardenTheme: "zen" | "sky" | "companion";
+  createdAt: string;
+  focusCount: number;
+  breakCount: number;
+  exerciseCount: number;
+  waterCount: number;
+}
+
+export interface RoomPresence {
+  key: string;
+  name: string;
+  joinedAt: number;
+}
+
+export type RoomStatus = "loading" | "ready" | "not_found" | "realtime_error";
+
+interface Broadcast {
+  state: { payload: RoomTimerState };
+  request_state: { payload: { fromKey: string } };
+  activity: { payload: { kind: "exercise" | "water"; byKey: string } };
+}
+
+const initialState = (): RoomTimerState => ({
+  phase: "focus",
+  isRunning: false,
+  phaseStartAt: Date.now(),
+  durationSec: ROOM_FOCUS_SEC,
+  pausedRemainingSec: ROOM_FOCUS_SEC,
+  updatedAt: 0,
+});
+
+const computeRemainingSec = (state: RoomTimerState): number => {
+  if (!state.isRunning) return Math.max(0, state.pausedRemainingSec);
+  const elapsed = Math.floor((Date.now() - state.phaseStartAt) / 1000);
+  return Math.max(0, state.durationSec - elapsed);
+};
+
+export function useFocusRoom(code: string | undefined, name: string) {
+  const [status, setStatus] = useState<RoomStatus>("loading");
+  const [info, setInfo] = useState<RoomInfo | null>(null);
+  const [presence, setPresence] = useState<RoomPresence[]>([]);
+  const [state, setState] = useState<RoomTimerState>(() => initialState());
+  const [remainingSec, setRemainingSec] = useState<number>(ROOM_FOCUS_SEC);
+
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const stateRef = useRef<RoomTimerState>(state);
+  stateRef.current = state;
+  const myKeyRef = useRef<string>("");
+  if (!myKeyRef.current) {
+    myKeyRef.current =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+  const presenceRef = useRef<RoomPresence[]>([]);
+  presenceRef.current = presence;
+
+  const broadcastState = useCallback((next: RoomTimerState) => {
+    const ch = channelRef.current;
+    if (!ch) return;
+    ch.send({
+      type: "broadcast",
+      event: "state",
+      payload: next,
+    }).catch(() => {});
+  }, []);
+
+  const applyLocal = useCallback(
+    (updater: (prev: RoomTimerState) => RoomTimerState, broadcast: boolean) => {
+      setState((prev) => {
+        const next = updater(prev);
+        if (broadcast) broadcastState(next);
+        return next;
+      });
+    },
+    [broadcastState],
+  );
+
+  const pause = useCallback(() => {
+    applyLocal((prev) => {
+      if (!prev.isRunning) return prev;
+      const remaining = computeRemainingSec(prev);
+      return {
+        ...prev,
+        isRunning: false,
+        pausedRemainingSec: remaining,
+        updatedAt: Date.now(),
+      };
+    }, true);
+  }, [applyLocal]);
+
+  const resume = useCallback(() => {
+    applyLocal((prev) => {
+      if (prev.isRunning) return prev;
+      const now = Date.now();
+      const consumed = prev.durationSec - prev.pausedRemainingSec;
+      return {
+        ...prev,
+        isRunning: true,
+        phaseStartAt: now - consumed * 1000,
+        updatedAt: now,
+      };
+    }, true);
+  }, [applyLocal]);
+
+  const skip = useCallback(() => {
+    applyLocal((prev) => {
+      const nextPhase: RoomPhase = prev.phase === "focus" ? "break" : "focus";
+      const nextDuration = nextPhase === "focus" ? ROOM_FOCUS_SEC : ROOM_BREAK_SEC;
+      const now = Date.now();
+      return {
+        phase: nextPhase,
+        isRunning: true,
+        phaseStartAt: now,
+        durationSec: nextDuration,
+        pausedRemainingSec: nextDuration,
+        updatedAt: now,
+      };
+    }, true);
+  }, [applyLocal]);
+
+  const logActivity = useCallback(
+    async (kind: "exercise" | "water") => {
+      if (!code || !isSupabaseConfigured) return;
+      try {
+        await supabase.rpc("log_room_event", { p_code: code, p_kind: kind });
+      } catch {
+        /* best-effort */
+      }
+      const ch = channelRef.current;
+      try {
+        await ch?.send({
+          type: "broadcast",
+          event: "activity",
+          payload: { kind, byKey: myKeyRef.current },
+        });
+      } catch {
+        /* best-effort */
+      }
+      void refreshCountsRef.current();
+    },
+    [code],
+  );
+
+  const refreshCountsRef = useRef<() => Promise<void>>(async () => {});
+  const refreshCounts = useCallback(async () => {
+    if (!code || !isSupabaseConfigured) return;
+    const { data, error } = await supabase.rpc("get_focus_room", { p_code: code });
+    if (error || !data) return;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return;
+    setInfo({
+      code: row.code,
+      gardenTheme: row.garden_theme,
+      createdAt: row.created_at,
+      focusCount: row.focus_count ?? 0,
+      breakCount: row.break_count ?? 0,
+      exerciseCount: row.exercise_count ?? 0,
+      waterCount: row.water_count ?? 0,
+    });
+  }, [code]);
+  useEffect(() => {
+    refreshCountsRef.current = refreshCounts;
+  }, [refreshCounts]);
+
+  // Load room info first.
+  useEffect(() => {
+    if (!code) return;
+    let cancelled = false;
+    (async () => {
+      if (!isSupabaseConfigured) {
+        setStatus("not_found");
+        return;
+      }
+      const { data, error } = await supabase.rpc("get_focus_room", { p_code: code });
+      if (cancelled) return;
+      if (error) {
+        setStatus("not_found");
+        return;
+      }
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) {
+        setStatus("not_found");
+        return;
+      }
+      setInfo({
+        code: row.code,
+        gardenTheme: row.garden_theme,
+        createdAt: row.created_at,
+        focusCount: row.focus_count ?? 0,
+        breakCount: row.break_count ?? 0,
+        exerciseCount: row.exercise_count ?? 0,
+        waterCount: row.water_count ?? 0,
+      });
+      setStatus("ready");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  // Realtime: presence + broadcast. We intentionally depend only on `code`
+  // and `status`; the name is read via ref so a cosmetic rename doesn't
+  // tear the channel down.
+  const nameRef = useRef(name);
+  useEffect(() => {
+    nameRef.current = name;
+  }, [name]);
+
+  useEffect(() => {
+    if (!code || status !== "ready" || !isSupabaseConfigured) return;
+    const channelName = `room:${code}`;
+    const channel = supabase.channel(channelName, {
+      config: { presence: { key: myKeyRef.current }, broadcast: { self: false } },
+    });
+    channelRef.current = channel;
+
+    const trimmedName = (nameRef.current || "").trim() || "Guest";
+    const joinedAt = Date.now();
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const stateMap = channel.presenceState<{ name: string; joinedAt: number }>();
+        const flat: RoomPresence[] = [];
+        for (const [key, metas] of Object.entries(stateMap)) {
+          const first = metas[0];
+          if (first) flat.push({ key, name: first.name ?? "Guest", joinedAt: first.joinedAt ?? Date.now() });
+        }
+        flat.sort((a, b) => (a.joinedAt === b.joinedAt ? a.key.localeCompare(b.key) : a.joinedAt - b.joinedAt));
+        setPresence(flat);
+      })
+      .on("broadcast", { event: "state" }, ({ payload }: Broadcast["state"]) => {
+        if (!payload || typeof payload.updatedAt !== "number") return;
+        if (payload.updatedAt < stateRef.current.updatedAt) return;
+        setState(payload);
+      })
+      .on("broadcast", { event: "request_state" }, ({ payload }: Broadcast["request_state"]) => {
+        if (!payload?.fromKey || payload.fromKey === myKeyRef.current) return;
+        const cur = stateRef.current;
+        if (cur.updatedAt > 0) {
+          channel.send({ type: "broadcast", event: "state", payload: cur }).catch(() => {});
+        }
+      })
+      .on("broadcast", { event: "activity" }, () => {
+        void refreshCounts();
+      });
+
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        channel
+          .track({ name: trimmedName, joinedAt })
+          .catch(() => {});
+        channel.send({
+          type: "broadcast",
+          event: "request_state",
+          payload: { fromKey: myKeyRef.current },
+        }).catch(() => {});
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        setStatus("realtime_error");
+      }
+    });
+
+    return () => {
+      try {
+        channel.unsubscribe();
+      } catch {
+        /* ignore */
+      }
+      channelRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, status]);
+
+  // Tick: 1 Hz, derive remainingSec from state.
+  useEffect(() => {
+    const tick = () => setRemainingSec(computeRemainingSec(stateRef.current));
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // Low-frequency counter poll so the shared garden stays accurate even if a
+  // broadcast is dropped (e.g. transient network blip).
+  useEffect(() => {
+    if (!code || status !== "ready") return;
+    const id = window.setInterval(() => {
+      void refreshCountsRef.current();
+    }, 10_000);
+    return () => window.clearInterval(id);
+  }, [code, status]);
+
+  // Phase transition: when remainingSec hits 0 while running, the lowest-key
+  // client advances the state and logs the completed phase.
+  const transitionLockRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (remainingSec > 0) return;
+    if (!stateRef.current.isRunning) return;
+    const sorted = [...presenceRef.current].sort((a, b) => a.key.localeCompare(b.key));
+    const leader = sorted[0]?.key;
+    const transitionKey = `${stateRef.current.phaseStartAt}:${stateRef.current.phase}`;
+    if (transitionLockRef.current === transitionKey) return;
+    transitionLockRef.current = transitionKey;
+
+    const endedPhase = stateRef.current.phase;
+    const nextPhase: RoomPhase = endedPhase === "focus" ? "break" : "focus";
+    const nextDuration = nextPhase === "focus" ? ROOM_FOCUS_SEC : ROOM_BREAK_SEC;
+    const now = Date.now();
+    const nextState: RoomTimerState = {
+      phase: nextPhase,
+      isRunning: true,
+      phaseStartAt: now,
+      durationSec: nextDuration,
+      pausedRemainingSec: nextDuration,
+      updatedAt: now,
+    };
+    setState(nextState);
+    if (leader === myKeyRef.current) {
+      broadcastState(nextState);
+      if (isSupabaseConfigured && code) {
+        (async () => {
+          try {
+            await supabase.rpc("log_room_event", { p_code: code, p_kind: endedPhase });
+          } catch {
+            /* best-effort */
+          }
+          void refreshCountsRef.current();
+        })();
+      }
+    }
+  }, [remainingSec, broadcastState, code]);
+
+  return {
+    status,
+    info,
+    presence,
+    state,
+    remainingSec,
+    myKey: myKeyRef.current,
+    pause,
+    resume,
+    skip,
+    logActivity,
+    refreshCounts,
+  };
+}

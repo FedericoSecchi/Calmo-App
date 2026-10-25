@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
@@ -24,12 +24,16 @@ import {
   RotateCcw,
   Check,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useWaterLogs } from "@/hooks/useWaterLogs";
 import { useManualBreakAdjustments } from "@/hooks/useManualBreakAdjustments";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { useFocusTimer, presets, type PresetId } from "@/contexts/FocusTimerContext";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
+import { track } from "@/lib/analytics";
+import { Users as UsersIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -50,8 +54,12 @@ const WATER_GOAL = 8;
 const Dashboard = () => {
   const { toast } = useToast();
   const { t } = useT();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { isGuest, user } = useAuth();
   const d = t.app.dashboard;
   const s = t.app.timer.settings;
+  const roomT = t.app.room;
   const stats = useDashboardStats();
   const { addWaterGlass, removeWaterGlass, isAdding: isAddingWater } = useWaterLogs();
   const { adjustToday } = useManualBreakAdjustments();
@@ -168,6 +176,48 @@ const Dashboard = () => {
     startNewDay();
     toast({ title: d.toasts.newDayTitle, description: d.toasts.newDayDesc });
   };
+
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+
+  const createRoom = async () => {
+    if (!isSupabaseConfigured) {
+      toast({ title: roomT.createError, variant: "destructive" });
+      return;
+    }
+    setIsCreatingRoom(true);
+    try {
+      const { data, error } = await supabase.rpc("create_focus_room", { p_theme: "zen" });
+      if (error || typeof data !== "string") {
+        toast({ title: roomT.createError, variant: "destructive" });
+        setIsCreatingRoom(false);
+        return;
+      }
+      track("room_created", { code: data });
+      navigate(`/app/room/${data}`);
+    } catch {
+      toast({ title: roomT.createError, variant: "destructive" });
+      setIsCreatingRoom(false);
+    }
+  };
+
+  const handleCreateRoomClick = () => {
+    if (isGuest || !user) {
+      navigate("/auth?mode=signup&create_room=1");
+      return;
+    }
+    void createRoom();
+  };
+
+  // Honor ?create_room=1 flag coming back from auth.
+  useEffect(() => {
+    if (searchParams.get("create_room") !== "1") return;
+    if (isGuest || !user) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("create_room");
+    setSearchParams(next, { replace: true });
+    void createRoom();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuest, user]);
 
   const phaseLabel = currentPhase === "rest" ? d.phase.rest : isRunning ? d.phase.inFocus : d.phase.paused;
   const presetSubline = format(d.presetSubline, {
@@ -718,6 +768,26 @@ const Dashboard = () => {
       >
         <h2 className="font-heading text-base text-foreground mb-3">{d.actions}</h2>
         <div className="flex flex-col gap-2">
+          <Button
+            variant="outline"
+            size="lg"
+            className="justify-start h-auto py-3"
+            onClick={handleCreateRoomClick}
+            disabled={isCreatingRoom}
+          >
+            {isCreatingRoom ? (
+              <Loader2 className="h-5 w-5 mr-3 text-primary animate-spin" />
+            ) : (
+              <UsersIcon className="h-5 w-5 mr-3 text-primary" />
+            )}
+            <div className="text-left">
+              <p className="font-medium text-sm">{roomT.shareTitle}</p>
+              <p className="text-xs text-muted-foreground">
+                {isGuest ? roomT.createNeedsAccount : roomT.shareDesc}
+              </p>
+            </div>
+          </Button>
+
           <Button variant="outline" size="lg" className="justify-start h-auto py-3" asChild>
             <Link to="/app/pain">
               <Activity className="h-5 w-5 mr-3 text-primary" />

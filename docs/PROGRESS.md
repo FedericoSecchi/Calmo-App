@@ -17,7 +17,7 @@ Three stages. Each stage must end with:
   - [x] 1.1 Single control center on Home (/app); /app/reminders → Navigate to /app
   - [x] 1.2 "Start new day" button + automatic calendar-day reset
   - [x] 1.3 Auto PiP, visual phase-end alert, tab-close warning
-- [ ] Stage 2 — Shared focus rooms
+- [x] Stage 2 — Shared focus rooms (verify PASS 2026-10-25)
 - [ ] Stage 3 — Garden with 3 styles
 
 ## Stage 1 verify (2026-10-25)
@@ -45,7 +45,23 @@ Backend already applied in Supabase (2026-10-25). The migration file `supabase/m
 
 ### Room codes created by tests (clean up manually)
 
-(none yet)
+Rooms created by room.spec.ts persist with `created_by = NULL` after the e2e+
+account is deleted (FK is `ON DELETE SET NULL`). They don't harm production
+but can be dropped by running:
+
+```sql
+delete from public.room_events where room_id in (
+  select id from public.focus_rooms where code = ANY($1)
+);
+delete from public.focus_rooms where code = ANY($1);
+```
+
+Known codes from local runs (2026-10-25):
+
+- `ab4807ea` (first iteration)
+- `025c5ebf`
+- `b2f9b541`
+- `18774c17` (manual script run)
 
 ## Garden (Stage 3)
 

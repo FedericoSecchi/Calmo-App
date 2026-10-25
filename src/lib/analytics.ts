@@ -16,6 +16,11 @@ const EVENT_NAMES = [
   "waitlist_join",
   "pwa_installed",
   "language_changed",
+  "room_created",
+  "room_joined",
+  "room_link_copied",
+  "garden_viewed",
+  "garden_shared",
 ] as const;
 
 export type EventName = (typeof EVENT_NAMES)[number];

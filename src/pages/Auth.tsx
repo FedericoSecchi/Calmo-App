@@ -45,12 +45,14 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  const appTarget = searchParams.get("create_room") === "1" ? "/app?create_room=1" : "/app";
+
   // Redirect only when we have a real session (not just a stale user object).
   useEffect(() => {
     if (user && session && !isGuest) {
-      navigate("/app", { replace: true });
+      navigate(appTarget, { replace: true });
     }
-  }, [user, session, isGuest, navigate]);
+  }, [user, session, isGuest, navigate, appTarget]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +74,7 @@ const Auth = () => {
           await migrateGuestDataToServer(result.data.session.user.id);
         }
         toast({ title: t.auth.toasts.accountCreated });
-        navigate("/app", { replace: true });
+        navigate(appTarget, { replace: true });
       } else {
         const result = await signIn(email, password);
         if (result.error) {
@@ -85,7 +87,7 @@ const Auth = () => {
           await migrateGuestDataToServer(result.data.session.user.id);
         }
         toast({ title: t.auth.toasts.welcomeBack });
-        navigate("/app", { replace: true });
+        navigate(appTarget, { replace: true });
       }
     } finally {
       setIsLoading(false);
