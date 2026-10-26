@@ -138,9 +138,13 @@ Six user-reported fixes bundled into one ship:
 - **Reset is a two-tap confirm, not a dialog.** First tap arms the button (visual accent + aria label flips to "¿Reiniciar?"), 3 s window to confirm with a second tap. Dialogs felt heavy for a flow we expect people to hit frequently.
 - **Verify runs vitest under `TZ=UTC`.** The pre-existing `stats.test.ts` is timezone-dependent on days that straddle UTC midnight (DST transition week especially). CI runs UTC already; verify.sh now matches so a local run doesn't greenlight something CI would reject. Documented inline.
 
-### Verify codes + runs
+### Verify runs (2026-10-26)
 
-(filled in on push — see tail of file)
+- `scripts/verify.sh` → PASS. Lighthouse mobile `/`=97, `/es/`=97 (both a11y=100, seo=100, bp=100, JS=113.7 KiB). A second standalone Lighthouse run after the suite showed `/`=98, `/es/`=97 — mild single-point variance, both above the 95 gate.
+- Local e2e: 35/35 passed in 1.5 min on commit `e0ed9fa`.
+- Remote e2e against production (`PLAYWRIGHT_BASE_URL=https://calmo.fit`): 35/35 passed in 1.8 min, no retries.
+- Production verify: `build-id=e0ed9fa7f3274f1aa309823fbf020a98ab948bf4` served at `calmo.fit`; all 18 canonical SEO / legal / join URLs return 200.
+- Local test rooms created: `6e325326`, `7c0b8782`, `903f1e04`. The `delete_focus_room` RPC runs in each test's cleanup; `focus_rooms.created_by ON DELETE CASCADE` handles the belt-and-suspenders path.
 
 ## Pending / manual review
 
