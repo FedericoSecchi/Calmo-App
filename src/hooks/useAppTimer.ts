@@ -8,6 +8,7 @@ export interface AppTimerShape {
   phaseLabel: "work" | "rest";
   toggle: () => void;
   skip: () => void;
+  resetPhase: () => void;
   formatTime: (sec: number) => string;
 }
 
@@ -26,6 +27,7 @@ export function useAppTimer(): AppTimerShape {
       phaseLabel: room.phase === "focus" ? "work" : "rest",
       toggle: () => (room.isRunning ? room.pause() : room.resume()),
       skip: () => room.skip(),
+      resetPhase: () => room.resetPhase(),
       formatTime: personal.formatTime,
     };
   }
@@ -37,6 +39,7 @@ export function useAppTimer(): AppTimerShape {
     phaseLabel: personal.currentPhase,
     toggle: personal.toggleTimer,
     skip: personal.skipToNextPhase,
+    resetPhase: personal.resetPhase,
     formatTime: personal.formatTime,
   };
 }

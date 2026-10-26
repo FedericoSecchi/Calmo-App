@@ -233,8 +233,8 @@ export const en = {
     presets: {
       light: {
         name: "Light",
-        description: "60 min work · 10 min rest",
-        interval: "60 min",
+        description: "25 min work · 5 min rest",
+        interval: "25 min",
       },
       standard: {
         name: "Balanced",
@@ -245,6 +245,11 @@ export const en = {
         name: "Deep focus",
         description: "90 min work · 10 min rest",
         interval: "90 min",
+      },
+      custom: {
+        name: "Custom",
+        description: "{work} min work · {rest} min rest",
+        interval: "{work} min",
       },
     },
     timer: {
@@ -284,6 +289,8 @@ export const en = {
         pause: "Pause",
         start: "Start",
         skip: "Skip",
+        reset: "Reset phase",
+        resetConfirm: "Reset?",
         focusLabel: "Focus",
         restLabel: "Break",
         tabCloseWarning:
@@ -292,6 +299,8 @@ export const en = {
       },
       settings: {
         rhythm: "Rhythm",
+        roomRhythm: "Room rhythm",
+        roomRhythmHint: "Changes the shared timer for everyone in this room.",
         rhythmUpdatedTitle: "Rhythm updated",
         rhythmUpdatedBody: "{name} active",
         rhythmError: "Couldn't save the rhythm",
@@ -550,7 +559,10 @@ export const en = {
         lunchDescription: "Pause reminders around noon",
       },
       goals: {
-        pain: { label: "Reduce pain", description: "Ease physical discomfort" },
+        discomfort: {
+          label: "Prevent discomfort",
+          description: "Short pauses to move and reset",
+        },
         productivity: {
           label: "Improve productivity",
           description: "Work with more energy",
@@ -711,6 +723,14 @@ export const en = {
       leaveConfirmCta: "Yes, leave",
       myRoomsEmpty: "No rooms yet. Create one to focus together.",
       myRoomsOwner: "Owner",
+      deleteCta: "Delete room",
+      deleteConfirmTitle: "Delete this room?",
+      deleteConfirmBody: "It will be deleted for everyone and its garden will be lost.",
+      deleteConfirmCta: "Yes, delete",
+      deleteError: "Couldn't delete the room. Please try again.",
+      deleteToastSelf: "Room deleted.",
+      deletedByOwner: "The owner deleted this room.",
+      removeFromMineCta: "Remove from my list",
       createNewTitle: "Create a new room",
       createNewPlaceholder: "Room name (optional)",
       createNewSubmit: "Create",
@@ -750,6 +770,73 @@ export const en = {
       toasts: {
         areaRequired: "Pick at least one area",
         saved: "Saved",
+      },
+    },
+    tour: {
+      skip: "Skip",
+      next: "Next",
+      done: "Got it",
+      stepLabel: "{current} of {total}",
+      steps: {
+        timer: {
+          title: "Focus and break timer",
+          description:
+            "The big button in the center starts and pauses your focus block. When focus ends, it flips to a break on its own.",
+        },
+        pip: {
+          title: "Floating window",
+          description:
+            "Open a tiny floating window so the timer stays visible. Minimize this tab — if you close it, the timer stops.",
+        },
+        exercises: {
+          title: "Exercises and breathing",
+          description:
+            "Use breaks to try short mobility exercises or a breathing guide. All optional.",
+        },
+        hydration: {
+          title: "Water and discomfort log",
+          description:
+            "Count glasses of water for the day. The discomfort log stays only on this device.",
+        },
+        social: {
+          title: "Garden and shared rooms",
+          description:
+            "Your focus grows a tiny garden. Share a focus room with friends so the timer stays in sync.",
+        },
+      },
+    },
+    help: {
+      openAria: "How Calmo works",
+      title: "How Calmo works",
+      description: "A quick tour of the main features.",
+      showTour: "Show the welcome guide again",
+      close: "Close",
+      sections: {
+        timer: {
+          title: "Focus and break timer",
+          body:
+            "Pick a rhythm (25/5, 45/5 or 90/10) and press the big button. Calmo switches between focus and break on its own and plays a soft cue before each phase ends.",
+        },
+        pip: {
+          title: "Floating window",
+          body:
+            "A tiny on-top window keeps the timer in view when you move between tabs. Keep this tab minimized — closing it stops the timer.",
+        },
+        exercises: {
+          title: "Mobility and breathing",
+          body:
+            "Four short exercises for neck, shoulders, wrists and lower back, plus a guided breathing exercise. Open them from the Exercises tab.",
+        },
+        hydration: {
+          title: "Water and discomfort",
+          body:
+            "Add a glass of water with one tap. The discomfort log is private: it stays only on your device, even with an account.",
+        },
+        social: {
+          title: "Garden and focus rooms",
+          body:
+            "Each focus session grows a deterministic garden. Create a focus room, share the link and your timer stays in sync with whoever joins.",
+        },
       },
     },
   },

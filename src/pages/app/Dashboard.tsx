@@ -37,6 +37,7 @@ import { GardenCard } from "@/components/garden/GardenCard";
 import { useGardenTheme } from "@/hooks/useGardenTheme";
 import type { GardenTheme } from "@/lib/garden/engine";
 import { MyRoomsCard } from "@/components/MyRoomsCard";
+import { RoomRhythmControls } from "@/components/RoomRhythmControls";
 import { getTodayCount, getWeekCount } from "@/lib/stats";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -117,6 +118,23 @@ const Dashboard = () => {
   const formatTime = appTimer.formatTime;
   const toggleTimer = appTimer.toggle;
   const skipToNextPhase = appTimer.skip;
+  const resetPhase = appTimer.resetPhase;
+  const [resetArmed, setResetArmed] = useState(false);
+  const [resetArmTimeout, setResetArmTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const handleResetPhase = () => {
+    if (resetArmed) {
+      setResetArmed(false);
+      if (resetArmTimeout) clearTimeout(resetArmTimeout);
+      resetPhase();
+      return;
+    }
+    setResetArmed(true);
+    const id = setTimeout(() => setResetArmed(false), 3000);
+    setResetArmTimeout(id);
+  };
+  useEffect(() => () => {
+    if (resetArmTimeout) clearTimeout(resetArmTimeout);
+  }, [resetArmTimeout]);
 
   const currentPresetName = t.app.presets[selectedPreset].name;
 
@@ -251,8 +269,8 @@ const Dashboard = () => {
             currentPhase === "rest" ? "bg-secondary/5 border-secondary/20" : "bg-card border-border/30"
           }`}
         >
-          <div className="flex items-center justify-between gap-3">
-            <div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-4xl font-bold text-foreground leading-none mb-1">{formatTime(timeRemaining)}</p>
               <p
                 className={`text-sm font-medium mt-1 ${
@@ -267,7 +285,7 @@ const Dashboard = () => {
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">{presetSubline}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
               {pipSupported && (
                 <button
                   onClick={() => (pipOpen ? closePipWindow() : openPipWindow())}
@@ -286,8 +304,23 @@ const Dashboard = () => {
                 <SkipForward className="h-5 w-5" />
               </button>
               <button
+                onClick={handleResetPhase}
+                className={`p-2 rounded-xl transition-colors ${
+                  resetArmed
+                    ? "text-primary bg-primary/5"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+                aria-label={
+                  resetArmed ? t.app.timer.pip.resetConfirm : t.app.timer.pip.reset
+                }
+                title={resetArmed ? t.app.timer.pip.resetConfirm : t.app.timer.pip.reset}
+                data-testid="reset-phase"
+              >
+                <RotateCcw className="h-5 w-5" />
+              </button>
+              <button
                 onClick={toggleTimer}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-colors ${
+                className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl font-medium text-sm transition-colors ${
                   isRunning
                     ? "bg-muted text-foreground hover:bg-muted/70"
                     : "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -295,7 +328,7 @@ const Dashboard = () => {
                 aria-label={isRunning ? d.pause : d.start}
               >
                 {isRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                {isRunning ? d.pause : d.start}
+                <span className="hidden sm:inline">{isRunning ? d.pause : d.start}</span>
               </button>
             </div>
           </div>
@@ -366,104 +399,123 @@ const Dashboard = () => {
               className="overflow-hidden"
             >
               <div className="mt-3 space-y-4">
-                <div className="rounded-2xl border border-border/30 bg-card p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                    {s.rhythm}
-                  </p>
-                  <div className="space-y-2">
-                    {presets.map((preset) => (
+                <div className="rounded-2xl border border-border/30 bg-card p-4" data-testid="dashboard-rhythm-panel">
+                  {activeRoomCtx.activeRoom && activeRoomCtx.state ? (
+                    <>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                        {s.roomRhythm}
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-3">{s.roomRhythmHint}</p>
+                      <RoomRhythmControls
+                        phaseRunning={activeRoomCtx.isRunning}
+                        rhythmId={activeRoomCtx.state.rhythmId}
+                        focusSec={activeRoomCtx.state.focusSec}
+                        breakSec={activeRoomCtx.state.breakSec}
+                        onPreset={(id) => activeRoomCtx.setRhythm(id)}
+                        onCustom={(w, b) => activeRoomCtx.setCustomRhythm(w, b)}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                        {s.rhythm}
+                      </p>
+                      <div className="space-y-2">
+                        {presets.map((preset) => (
+                          <button
+                            key={preset.id}
+                            onClick={() => handlePresetChange(preset.id)}
+                            disabled={personalIsRunning}
+                            className={`w-full p-3 rounded-xl border-2 transition-all flex items-center justify-between text-left ${
+                              selectedPreset === preset.id
+                                ? "border-primary bg-primary/5"
+                                : "border-border bg-background hover:border-border/80"
+                            } ${personalIsRunning ? "opacity-50 cursor-not-allowed" : ""}`}
+                          >
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {t.app.presets[preset.id].name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {t.app.presets[preset.id].interval} · {t.app.presets[preset.id].description}
+                              </p>
+                            </div>
+                            {selectedPreset === preset.id && (
+                              <Check className="h-4 w-4 text-primary" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                      {personalIsRunning && (
+                        <p className="mt-3 text-xs text-muted-foreground">
+                          {s.changeWhilePausedHint}
+                        </p>
+                      )}
+
                       <button
-                        key={preset.id}
-                        onClick={() => handlePresetChange(preset.id)}
+                        type="button"
+                        onClick={() => setAdvancedOpen((o) => !o)}
                         disabled={personalIsRunning}
-                        className={`w-full p-3 rounded-xl border-2 transition-all flex items-center justify-between text-left ${
-                          selectedPreset === preset.id
-                            ? "border-primary bg-primary/5"
-                            : "border-border bg-background hover:border-border/80"
-                        } ${personalIsRunning ? "opacity-50 cursor-not-allowed" : ""}`}
+                        className={`mt-3 w-full flex items-center justify-between p-2 rounded-lg border border-border/40 text-xs text-muted-foreground transition ${
+                          personalIsRunning ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/40"
+                        }`}
                       >
-                        <div>
-                          <p className="font-medium text-foreground">
-                            {t.app.presets[preset.id].name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {t.app.presets[preset.id].interval} · {t.app.presets[preset.id].description}
-                          </p>
-                        </div>
-                        {selectedPreset === preset.id && (
-                          <Check className="h-4 w-4 text-primary" />
+                        <span>{s.advanced}</span>
+                        {advancedOpen ? (
+                          <ChevronDown className="h-3 w-3" />
+                        ) : (
+                          <ChevronRight className="h-3 w-3" />
                         )}
                       </button>
-                    ))}
-                  </div>
-                  {personalIsRunning && (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      {s.changeWhilePausedHint}
-                    </p>
+                      <AnimatePresence>
+                        {advancedOpen && !personalIsRunning && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="mt-3 space-y-3 rounded-lg border border-border/40 p-3">
+                              <p className="text-xs font-medium text-foreground">{s.customRhythm}</p>
+                              <div>
+                                <label className="text-xs text-muted-foreground mb-1 block">
+                                  {s.workMinutes}
+                                </label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={customWorkMinutes}
+                                  onChange={(e) =>
+                                    setCustomWorkMinutes(Math.max(1, parseInt(e.target.value) || 1))
+                                  }
+                                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-muted-foreground mb-1 block">
+                                  {s.restMinutes}
+                                </label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={customRestMinutes}
+                                  onChange={(e) =>
+                                    setCustomRestMinutes(Math.max(1, parseInt(e.target.value) || 1))
+                                  }
+                                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground"
+                                />
+                              </div>
+                              <Button onClick={handleCustomTimings} className="w-full" size="sm">
+                                {s.applyCustom}
+                              </Button>
+                              <p className="text-xs text-muted-foreground">{s.customNote}</p>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </>
                   )}
-
-                  <button
-                    type="button"
-                    onClick={() => setAdvancedOpen((o) => !o)}
-                    disabled={personalIsRunning}
-                    className={`mt-3 w-full flex items-center justify-between p-2 rounded-lg border border-border/40 text-xs text-muted-foreground transition ${
-                      personalIsRunning ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/40"
-                    }`}
-                  >
-                    <span>{s.advanced}</span>
-                    {advancedOpen ? (
-                      <ChevronDown className="h-3 w-3" />
-                    ) : (
-                      <ChevronRight className="h-3 w-3" />
-                    )}
-                  </button>
-                  <AnimatePresence>
-                    {advancedOpen && !personalIsRunning && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="mt-3 space-y-3 rounded-lg border border-border/40 p-3">
-                          <p className="text-xs font-medium text-foreground">{s.customRhythm}</p>
-                          <div>
-                            <label className="text-xs text-muted-foreground mb-1 block">
-                              {s.workMinutes}
-                            </label>
-                            <input
-                              type="number"
-                              min={1}
-                              value={customWorkMinutes}
-                              onChange={(e) =>
-                                setCustomWorkMinutes(Math.max(1, parseInt(e.target.value) || 1))
-                              }
-                              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground mb-1 block">
-                              {s.restMinutes}
-                            </label>
-                            <input
-                              type="number"
-                              min={1}
-                              value={customRestMinutes}
-                              onChange={(e) =>
-                                setCustomRestMinutes(Math.max(1, parseInt(e.target.value) || 1))
-                              }
-                              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground"
-                            />
-                          </div>
-                          <Button onClick={handleCustomTimings} className="w-full" size="sm">
-                            {s.applyCustom}
-                          </Button>
-                          <p className="text-xs text-muted-foreground">{s.customNote}</p>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
 
                 <div className="rounded-2xl border border-border/30 bg-card p-4 space-y-4">

@@ -26,6 +26,7 @@ test.describe("Account round-trip", () => {
     await page.getByRole("button", { name: /create account/i }).click();
     await expect(page).toHaveURL(/\/app/, { timeout: 20_000 });
 
+    await page.evaluate(() => localStorage.setItem("calmo_onboarding_complete", "1"));
     await page.goto("/app/settings");
     await page.getByRole("button", { name: /^sign out$/i }).click();
     await expect(page).toHaveURL(/\/auth/, { timeout: 10_000 });
@@ -41,6 +42,7 @@ test.describe("Account round-trip", () => {
     await page2.getByRole("button", { name: /^sign in$/i }).click();
     await expect(page2).toHaveURL(/\/app/, { timeout: 20_000 });
 
+    await page2.evaluate(() => localStorage.setItem("calmo_onboarding_complete", "1"));
     await page2.goto("/app/settings");
     await page2.getByRole("button", { name: /^delete my account$/i }).click();
     await page2

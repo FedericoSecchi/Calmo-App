@@ -25,7 +25,10 @@ echo "[verify] Node $(node --version), npm $(npm --version)"
 
 run "tsc --noEmit" npx tsc --noEmit
 run "eslint" npx eslint .
-run "vitest (unit)" npx vitest run
+# vitest runs under TZ=UTC: some streak tests reason about calendar days in
+# UTC (see src/lib/utils.ts formatDateToYYYYMMDD), so running under a local
+# timezone that straddles the UTC midnight breaks them. CI already runs UTC.
+run "vitest (unit)" env TZ=UTC npx vitest run
 run "build" npm run build
 
 run "prerender" node scripts/prerender.mjs

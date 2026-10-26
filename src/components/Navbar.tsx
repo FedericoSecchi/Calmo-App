@@ -5,11 +5,13 @@ import { Menu, X, Globe } from "lucide-react";
 import { useState } from "react";
 import { useT } from "@/lib/i18n";
 import { HOME_PATHS } from "@/lib/i18n/types";
+import { useSessionHint } from "@/lib/sessionHint";
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { t, lang } = useT();
   const location = useLocation();
+  const hasSession = useSessionHint();
 
   const other = lang === "en" ? "es" : "en";
   const switchHref = (() => {
@@ -49,12 +51,20 @@ export const Navbar = () => {
                 {t.meta.switchLanguage}
               </Link>
             </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to={authPath}>{t.nav.signIn}</Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link to={`${authPath}?mode=signup`}>{t.nav.getStarted}</Link>
-            </Button>
+            {hasSession ? (
+              <Button size="sm" asChild data-testid="nav-open-app">
+                <Link to="/app">{t.nav.openApp}</Link>
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to={authPath}>{t.nav.signIn}</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link to={`${authPath}?mode=signup`}>{t.nav.getStarted}</Link>
+                </Button>
+              </>
+            )}
           </div>
 
           <button
@@ -87,12 +97,20 @@ export const Navbar = () => {
                   {t.meta.switchLanguage}
                 </Link>
               </Button>
-              <Button variant="outline" asChild className="w-full">
-                <Link to={authPath}>{t.nav.signIn}</Link>
-              </Button>
-              <Button asChild className="w-full">
-                <Link to={`${authPath}?mode=signup`}>{t.nav.getStarted}</Link>
-              </Button>
+              {hasSession ? (
+                <Button asChild className="w-full" data-testid="nav-open-app-mobile">
+                  <Link to="/app">{t.nav.openApp}</Link>
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" asChild className="w-full">
+                    <Link to={authPath}>{t.nav.signIn}</Link>
+                  </Button>
+                  <Button asChild className="w-full">
+                    <Link to={`${authPath}?mode=signup`}>{t.nav.getStarted}</Link>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>

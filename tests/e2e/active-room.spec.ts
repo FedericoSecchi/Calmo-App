@@ -51,6 +51,7 @@ async function openGuest(context: BrowserContext, path = "/app") {
     try {
       localStorage.setItem("calmo_lang", "en");
       localStorage.setItem("calmo_guest_mode", "1");
+      localStorage.setItem("calmo_onboarding_complete", "1");
       localStorage.removeItem("calmo_active_room");
       localStorage.removeItem("calmo_room_name");
       localStorage.removeItem("calmo_visited_rooms");
@@ -132,6 +133,8 @@ test.describe("Active room UX", () => {
       await page.fill('input[type="password"]', STRONG_TEST_PASSWORD);
       await page.getByRole("button", { name: /sign in/i }).click();
       await expect(page).toHaveURL(/\/app/, { timeout: 20_000 });
+      await page.evaluate(() => localStorage.setItem("calmo_onboarding_complete", "1"));
+      await page.reload();
 
       // My Rooms card shows the named room.
       const myRooms = page.getByTestId("my-rooms-card");

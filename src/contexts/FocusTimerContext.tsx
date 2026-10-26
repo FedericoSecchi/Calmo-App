@@ -53,7 +53,7 @@ export interface ScreenBreakState {
 }
 
 export const presets: PresetConfig[] = [
-  { id: "light", workMinutes: 60, restMinutes: 10 },
+  { id: "light", workMinutes: 25, restMinutes: 5 },
   { id: "standard", workMinutes: 45, restMinutes: 5 },
   { id: "focus", workMinutes: 90, restMinutes: 10 },
 ];
@@ -99,6 +99,7 @@ interface FocusTimerContextType {
   pauseTimer: () => void;
   toggleTimer: () => void;
   skipToNextPhase: () => void;
+  resetPhase: () => void;
   startNewDay: () => void;
   setPreset: (preset: PresetId) => void;
   setCustomTimings: (workMinutes: number, restMinutes: number) => void; // Set custom timings (session-only, doesn't persist)
@@ -730,6 +731,19 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     setTimeRemaining(0); // Trigger phase completion
   }, []);
 
+  // Reset the current phase to its full duration without flipping phase.
+  // Running state is preserved: a running phase keeps running from the start,
+  // a paused phase stays paused with the full duration available.
+  const resetPhase = useCallback(() => {
+    const config = getPresetConfig(selectedPreset);
+    const total =
+      currentPhase === "work"
+        ? config.workMinutes * 60
+        : (customRestMinutes ?? config.restMinutes) * 60;
+    setTimeRemaining(total);
+    phaseTransitionRef.current = false;
+  }, [getPresetConfig, selectedPreset, currentPhase, customRestMinutes]);
+
   const startNewDay = useCallback(() => {
     const config = getPresetConfig(selectedPreset);
     setIsRunning(false);
@@ -1114,6 +1128,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     pauseTimer,
     toggleTimer,
     skipToNextPhase,
+    resetPhase,
     startNewDay,
     setPreset,
     setCustomTimings,

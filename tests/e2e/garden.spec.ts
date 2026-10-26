@@ -6,6 +6,7 @@ async function openGuestInEnglish(page: Page) {
     try {
       localStorage.setItem("calmo_lang", "en");
       localStorage.setItem("calmo_guest_mode", "1");
+      localStorage.setItem("calmo_onboarding_complete", "1");
       localStorage.removeItem("calmo_garden_theme");
       localStorage.removeItem("calmo_break_logs");
     } catch {

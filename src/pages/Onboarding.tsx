@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,11 @@ import {
 } from "lucide-react";
 import { Footer } from "@/components/Footer";
 import { useT, format, writeStoredLang, type Lang } from "@/lib/i18n";
+import { ONBOARDING_DONE_KEY, markOnboardingDone, readOnboardingDone } from "@/lib/onboardingFlag";
+import { track } from "@/lib/analytics";
 
 type StepId = "schedule" | "goal" | "pain" | "flow" | "preferences";
-type GoalId = "pain" | "productivity" | "both";
+type GoalId = "discomfort" | "productivity" | "both";
 type PainAreaOnboardingId = "lumbar" | "cervical" | "wrist" | "none";
 type FlowId = "lumbar" | "cervical";
 
@@ -40,6 +42,14 @@ const Onboarding = () => {
     reduceMotion: false,
   });
 
+  // Someone who already finished the onboarding (or the welcome tour) shouldn't
+  // be forced through it again — send them straight to /app.
+  useEffect(() => {
+    if (readOnboardingDone()) {
+      navigate("/app", { replace: true });
+    }
+  }, [navigate]);
+
   const handleNext = () => {
     if (currentStep < stepIds.length - 1) {
       setCurrentStep(currentStep + 1);
@@ -47,9 +57,13 @@ const Onboarding = () => {
       if (preferences.language !== lang) {
         writeStoredLang(preferences.language as Lang);
       }
+      markOnboardingDone();
+      track("onboarding_complete", { via: "wizard", skipped: false });
       navigate("/app");
     }
   };
+
+  void ONBOARDING_DONE_KEY;
 
   const handleBack = () => {
     if (currentStep > 0) {
@@ -114,7 +128,7 @@ const Onboarding = () => {
           <div className="space-y-3">
             {(
               [
-                { id: "pain" as GoalId, Icon: Activity },
+                { id: "discomfort" as GoalId, Icon: Activity },
                 { id: "productivity" as GoalId, Icon: Target },
                 { id: "both" as GoalId, Icon: Clock },
               ] as const

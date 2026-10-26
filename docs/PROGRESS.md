@@ -113,9 +113,41 @@ Visual-review fixes across the whole stack. Highlights:
 - `ba8c93a9` — remote e2e vs prod, existing room sync test
 - All cascade-delete with the e2e account; `get_focus_room_meta` returns `[]` after cleanup.
 
+## Retention + room-control pass (2026-10-26)
+
+Six user-reported fixes bundled into one ship:
+
+1. **Logo + logged-in Navbar.** `AppLayout` logo now links to `/app` (was "/"). Public Navbar + Hero/Pricing/CTA on landing swap to a single "Abrir app" button when a session or guest flag exists. The hint is read from `localStorage` via `src/lib/sessionHint.ts` — no AuthProvider on the landing bundle, so prerendered HTML and SEO stay identical and the swap happens at hydration without visible CLS. `/auth` with session or guest flag redirects to `/app`.
+2. **Welcome tour + "¿Cómo funciona?" sheet.** First `/app` visit (guest or account) opens a 5-step guided tour: timer, PiP window, exercises/breathing, water + dolor (local only), jardín + salas. "?" button next to the avatar opens a right-side sheet with the same five topics in more detail plus a "Ver la guía de nuevo" button. State persisted via `calmo_onboarding_complete` localStorage key (shared with the `/onboarding` wizard; both skip when set). Analytics: `onboarding_complete` with `{ via: "tour" | "wizard", skipped: boolean }` — no new event names. Onboarding goal **"Reducir dolor / Reduce pain" → "Prevenir molestias / Prevent discomfort"** (no medical promise). Only features that exist in the code are described (four exercises, breathing guide, private pain log, 25/5-45/5-90/10 rhythms).
+3. **Rhythm order.** `presets` and `ROOM_RHYTHMS` now ascend: **Suave 25/5, Balanceado 45/5, Profundo 90/10**. Users with `"light"` stored jump to 25/5 at next phase; running timer keeps its current phase and only applies at the next transition. `rhythmFromFocusSec` now tags legacy 60-min rooms as `"custom"` with their stored durations, so an old pre-change room still shows 60 min instead of silently flipping to 25.
+4. **Custom room rhythm + Home panel switches to room.** New `setCustomRhythm(workMin, restMin)` on `useFocusRoom` + context. Room page gets an "Advanced" sub-section (same shape as Home's Advanced) with inputs for focus 5–120 min and break 1–30 min. Broadcast payload carries `focusSec` + `breakSec`; backfill handles legacy clients. With an active room, the Home "Rhythm" panel re-titles to "Ritmo de la sala" and routes clicks to the room's rhythm, not the personal preset. Controls disable while the room timer is running, with the existing "pause the timer to change the rhythm" hint.
+5. **Delete room (owner) + remove from list (guest).** `supabase/migrations/008_delete_focus_room.sql` documents the live RPC (applied via Claude.ai, `security definer`, owner-only, authenticated-only; cascade removes `room_events`). New `deleteRoom()` on the hook broadcasts `room_deleted` on the room channel then calls the RPC. `MyRoomsCard` and the in-room header show "Eliminar sala" with a confirm dialog ("Se borra para todos y se pierde su jardín") for owners; non-owners see "Quitar de mi lista" that just removes the visited entry. Non-owners currently in the room auto-navigate to `/app` within ~1 s thanks to `active.status === "deleted"` being piped through `ActiveRoomContext`.
+6. **PiP reset-phase (removes own X).** The custom X in `PipTimerWindow` is gone — Chrome's native close is enough. The slot now hosts "Reiniciar fase" (two-tap confirm with 3 s arming window) that snaps the current phase back to its full duration while preserving phase + running state. The same button is on Home next to play/skip. In an active room, reset goes through the broadcast like skip (`resetPhase` on `useFocusRoom`), so everyone resynchronizes to the same `phaseStartAt`.
+
+### Code touch summary
+
+- New: `src/lib/sessionHint.ts`, `src/lib/onboardingFlag.ts`, `src/components/WelcomeTour.tsx`, `src/components/HelpSheet.tsx`, `src/components/RoomRhythmControls.tsx`, `src/lib/timerReset.test.ts`, `src/lib/roomRhythm.test.ts`, `tests/e2e/retention.spec.ts`, `tests/e2e/welcome-tour.spec.ts`, `tests/e2e/room-custom-rhythm.spec.ts`, `tests/e2e/room-delete.spec.ts`, `supabase/migrations/008_delete_focus_room.sql`.
+- Modified: `src/layouts/AppLayout.tsx`, `src/components/Navbar.tsx`, `src/components/landing/{HeroSection,CTASection,PricingSection}.tsx`, `src/pages/Auth.tsx`, `src/pages/Onboarding.tsx`, `src/contexts/{FocusTimerContext,ActiveRoomContext}.tsx`, `src/hooks/{useAppTimer,useFocusRoom}.ts`, `src/pages/app/{Dashboard,Room}.tsx`, `src/components/{MyRoomsCard,PipTimerWindow}.tsx`, `src/lib/i18n/{en,es}.ts`, `src/lib/timer.test.ts`.
+- Tests updated to pre-set `calmo_onboarding_complete` so the welcome tour overlay doesn't block existing e2e flows: `active-room`, `garden`, `layout`, `room`, `i18n-app`, `guest`, `account`, `auth-perf`, `timer`.
+
+### Decisions
+
+- **Session hint is localStorage-only, no AuthProvider on the landing.** Avoids pulling Supabase into the SSR/prerender bundle. The hint reads `calmo_guest_mode` and `sb-wtquhlfodfqjcggaqxwk-auth-token` and `expires_at`; it's best-effort — nothing security-sensitive depends on it. Default (unmounted/initial) is `false` to match the prerendered HTML; swap happens on hydration.
+- **Welcome tour and the existing `/onboarding` wizard share the `calmo_onboarding_complete` key.** Either flow marks it, and either is skipped if the other has run. Both now call `track("onboarding_complete", { via, skipped })`. No new analytics event names (the `events` table only allows the existing list).
+- **Legacy rooms keep their stored duration and surface as "custom".** We considered re-interpreting legacy `light` rooms (60-min focus) as the new 25/5, but that would re-time an active session for people connected right now. Treating them as custom keeps the behavior the user saw and the UI honest.
+- **Reset is a two-tap confirm, not a dialog.** First tap arms the button (visual accent + aria label flips to "¿Reiniciar?"), 3 s window to confirm with a second tap. Dialogs felt heavy for a flow we expect people to hit frequently.
+- **Verify runs vitest under `TZ=UTC`.** The pre-existing `stats.test.ts` is timezone-dependent on days that straddle UTC midnight (DST transition week especially). CI runs UTC already; verify.sh now matches so a local run doesn't greenlight something CI would reject. Documented inline.
+
+### Verify codes + runs
+
+(filled in on push — see tail of file)
+
 ## Pending / manual review
 
 - Visual QA of garden styles.
+- Visual QA of the Welcome tour and "¿Cómo funciona?" sheet on real mobile + desktop (375 / 768 / 1280).
+- PiP window reset-phase button in real Chromium — e2e only tests reset from Home; verify two-tap behavior and the reset button layout inside the PiP window manually.
+- Two-browser room with a custom rhythm (manual sanity on top of the automated test).
 - PiP window on real browser (Chromium) — e2e only feature-detects.
 - Two-browser room sync test (manual).
 - PWA link capture matrix: Chromium 92+ (`handle_links: "preferred"`) and 102+ (`launch_handler.client_mode: "navigate-existing"`) → calmo.fit links open the installed PWA (after user approval). Safari/iOS 17+ ignores both fields and still opens Safari; the user has to invoke the PWA manually. Firefox Android ignores both; opens the browser tab. Documented so no surprises when the owner installs the app on different platforms.

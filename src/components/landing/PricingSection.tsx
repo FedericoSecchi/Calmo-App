@@ -6,6 +6,7 @@ import { Check, Sparkles, Loader2 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useWaitlist } from "@/hooks/useWaitlist";
 import { track } from "@/lib/analytics";
+import { useSessionHint } from "@/lib/sessionHint";
 
 function resolveSource(fallback: string): string {
   if (typeof window === "undefined") return fallback;
@@ -22,6 +23,9 @@ export const PricingSection = () => {
   const { t } = useT();
   const { status, error, submit } = useWaitlist(resolveSource(t.waitlist.sources.pricing));
   const [email, setEmail] = useState("");
+  const hasSession = useSessionHint();
+  const freeCtaHref = hasSession ? "/app" : "/auth?mode=signup";
+  const freeCtaLabel = hasSession ? t.nav.openApp : t.pricing.free.cta;
 
   useEffect(() => {
     track("pricing_view");
@@ -63,7 +67,7 @@ export const PricingSection = () => {
             </ul>
 
             <Button variant="outline" size="lg" className="w-full" asChild>
-              <Link to="/auth?mode=signup">{t.pricing.free.cta}</Link>
+              <Link to={freeCtaHref}>{freeCtaLabel}</Link>
             </Button>
           </div>
 

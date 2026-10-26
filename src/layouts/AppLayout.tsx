@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Outlet, NavLink, useLocation } from "react-router-dom";
-import { Home, Dumbbell, Activity, Settings, Play, Pause } from "lucide-react";
+import { Home, Dumbbell, Activity, Settings, Play, Pause, HelpCircle } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +16,8 @@ import { useAppTimer } from "@/hooks/useAppTimer";
 import { useActiveRoom } from "@/contexts/ActiveRoomContext";
 import { ActiveRoomStrip } from "@/components/ActiveRoomStrip";
 import { useT, format } from "@/lib/i18n";
+import { WelcomeTour, useWelcomeTour } from "@/components/WelcomeTour";
+import { HelpSheet } from "@/components/HelpSheet";
 
 const AppLayout = () => {
   const location = useLocation();
@@ -27,6 +30,8 @@ const AppLayout = () => {
   } = useFocusTimer();
   const appTimer = useAppTimer();
   const { activeRoom } = useActiveRoom();
+  const tour = useWelcomeTour();
+  const [helpOpen, setHelpOpen] = useState(false);
   const isRunning = appTimer.isRunning;
   const timeRemaining = appTimer.remainingSec;
   const formatTime = appTimer.formatTime;
@@ -65,14 +70,32 @@ const AppLayout = () => {
           className="fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-40 flex items-center justify-between px-4"
           style={{ paddingTop: "env(safe-area-inset-top)" }}
         >
-          <Logo size="sm" />
-          <NavLink
-            to="/app/settings"
-            className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-sm touch-manipulation"
-          >
-            {getUserInitials()}
-          </NavLink>
+          <Logo size="sm" to="/app" />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors touch-manipulation"
+              aria-label={t.app.help.openAria}
+              data-testid="help-open"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </button>
+            <NavLink
+              to="/app/settings"
+              className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-sm touch-manipulation"
+            >
+              {getUserInitials()}
+            </NavLink>
+          </div>
         </div>
+
+        <WelcomeTour open={tour.isOpen} onClose={tour.close} />
+        <HelpSheet
+          open={helpOpen}
+          onOpenChange={setHelpOpen}
+          onShowTour={() => tour.open()}
+        />
 
         <ActiveRoomStrip />
 

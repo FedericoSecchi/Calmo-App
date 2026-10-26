@@ -57,6 +57,7 @@ async function openGuest(page: Page, lang: "en" | "es") {
     try {
       localStorage.setItem("calmo_lang", lang);
       localStorage.setItem("calmo_guest_mode", "1");
+      localStorage.setItem("calmo_onboarding_complete", "1");
     } catch {
       /* ignore */
     }

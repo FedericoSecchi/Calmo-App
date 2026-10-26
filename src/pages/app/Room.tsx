@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Pause,
   Play,
@@ -15,15 +15,16 @@ import {
   Pencil,
   DoorOpen,
   Check,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ROOM_RHYTHMS, type RoomRhythmId } from "@/hooks/useFocusRoom";
+import { RoomRhythmControls } from "@/components/RoomRhythmControls";
 import { useT, format } from "@/lib/i18n";
 import { track } from "@/lib/analytics";
 import { GardenCard } from "@/components/garden/GardenCard";
 import type { GardenTheme } from "@/lib/garden/engine";
-import { useFocusTimer, type PresetId } from "@/contexts/FocusTimerContext";
+import { useFocusTimer } from "@/contexts/FocusTimerContext";
 import { JOIN_PATHS } from "@/lib/i18n/types";
 import { useActiveRoom } from "@/contexts/ActiveRoomContext";
 import {
@@ -93,6 +94,7 @@ const RoomView = ({ code, onChangeName }: RoomViewProps) => {
   const { t, lang } = useT();
   const r = t.app.room;
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { selectedPreset } = useFocusTimer();
   const active = useActiveRoom();
 
@@ -107,28 +109,47 @@ const RoomView = ({ code, onChangeName }: RoomViewProps) => {
     resume,
     skip,
     setRhythm,
+    setCustomRhythm,
     logActivity,
     rename,
+    deleteRoom,
     leaveActiveRoom,
   } = active;
 
-  // Ensure the active-room slot is set to this URL. Also seed the room's
-  // rhythm from the user's personal preset the first time around.
+  // When the owner-side delete arrives, the live hook flips status to
+  // "deleted" and ActiveRoomContext clears the slot. Bounce back to /app and
+  // make sure the "ensure active-room slot" effect doesn't re-add the room.
+  const roomGoneRef = useRef(false);
   useEffect(() => {
+    if (roomGoneRef.current) return;
+    if (active.status === "deleted" || active.status === "not_found") {
+      roomGoneRef.current = true;
+      navigate("/app", { replace: true });
+    }
+  }, [active.status, navigate]);
+
+  // Ensure the active-room slot is set to this URL. Skip once we've been
+  // kicked out so a server-side delete actually sticks.
+  useEffect(() => {
+    if (roomGoneRef.current) return;
     if (!activeRoom || activeRoom.code !== code) {
       active.setActiveRoom({ code, nickname: readNickname() });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, activeRoom?.code]);
 
-  // Prime the broadcast state's rhythm the first time this room is new.
+  // Prime the broadcast state's rhythm the first time this room is new. Only
+  // seeds known preset ids — a "custom" selectedPreset doesn't exist on the
+  // personal timer side.
   const primedRef = useRef(false);
   useEffect(() => {
     if (primedRef.current) return;
     if (!state) return;
-    if (state.updatedAt > 0) return; // somebody already set rhythm
+    if (state.updatedAt > 0) return;
     primedRef.current = true;
-    setRhythm(selectedPreset as RoomRhythmId);
+    if (selectedPreset === "light" || selectedPreset === "standard" || selectedPreset === "focus") {
+      setRhythm(selectedPreset);
+    }
   }, [state, selectedPreset, setRhythm]);
 
   const trackedJoinRef = useRef(false);
@@ -181,7 +202,6 @@ const RoomView = ({ code, onChangeName }: RoomViewProps) => {
     setRenameValue(info?.name ?? "");
   }, [info?.name]);
   const [renaming, setRenaming] = useState(false);
-  const navigate = useNavigate();
 
   const handleRename = async () => {
     setRenaming(true);
@@ -196,6 +216,19 @@ const RoomView = ({ code, onChangeName }: RoomViewProps) => {
 
   const handleLeave = () => {
     leaveActiveRoom();
+    navigate("/app");
+  };
+
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    setDeleting(true);
+    const ok = await deleteRoom();
+    setDeleting(false);
+    if (!ok) {
+      toast({ title: r.deleteError, variant: "destructive" });
+      return;
+    }
+    toast({ title: r.deleteToastSelf });
     navigate("/app");
   };
 
@@ -327,34 +360,14 @@ const RoomView = ({ code, onChangeName }: RoomViewProps) => {
           </Button>
         </div>
 
-        <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-            {r.rhythmLabel}
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {Object.values(ROOM_RHYTHMS).map((rhythm) => {
-              const isActive = state.rhythmId === rhythm.id;
-              return (
-                <button
-                  key={rhythm.id}
-                  type="button"
-                  onClick={() => setRhythm(rhythm.id as RoomRhythmId)}
-                  disabled={isRunning}
-                  className={`p-2 rounded-xl border-2 text-xs font-medium transition-all ${
-                    isActive
-                      ? "border-primary bg-primary/5 text-foreground"
-                      : "border-border text-muted-foreground hover:border-border/80"
-                  } ${isRunning ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  {t.app.presets[rhythm.id as PresetId].name}
-                </button>
-              );
-            })}
-          </div>
-          {isRunning && (
-            <p className="mt-2 text-xs text-muted-foreground">{r.rhythmChangeHint}</p>
-          )}
-        </div>
+        <RoomRhythmControls
+          phaseRunning={isRunning}
+          rhythmId={state.rhythmId}
+          focusSec={state.focusSec}
+          breakSec={state.breakSec}
+          onPreset={(id) => setRhythm(id)}
+          onCustom={(w, b) => setCustomRhythm(w, b)}
+        />
       </motion.div>
 
       <div className="mb-5 grid grid-cols-2 gap-2">
@@ -453,24 +466,66 @@ const RoomView = ({ code, onChangeName }: RoomViewProps) => {
             {r.back}
           </Link>
         </Button>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="outline" size="sm" data-testid="room-leave">
-              <DoorOpen className="h-4 w-4 mr-2" />
-              {r.leaveConfirmCta}
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{r.leaveConfirmTitle}</AlertDialogTitle>
-              <AlertDialogDescription>{r.leaveConfirmBody}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{t.app.dashboard.newDayCancel}</AlertDialogCancel>
-              <AlertDialogAction onClick={handleLeave}>{r.leaveConfirmCta}</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <div className="flex items-center gap-2">
+          {info?.isOwner && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  data-testid="room-delete"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {r.deleteCta}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{r.deleteConfirmTitle}</AlertDialogTitle>
+                  <AlertDialogDescription>{r.deleteConfirmBody}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>
+                    {t.app.dashboard.newDayCancel}
+                  </AlertDialogCancel>
+                  <AlertDialogAction asChild>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      data-testid="room-delete-confirm"
+                    >
+                      {deleting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        r.deleteConfirmCta
+                      )}
+                    </Button>
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" data-testid="room-leave">
+                <DoorOpen className="h-4 w-4 mr-2" />
+                {r.leaveConfirmCta}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{r.leaveConfirmTitle}</AlertDialogTitle>
+                <AlertDialogDescription>{r.leaveConfirmBody}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t.app.dashboard.newDayCancel}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLeave}>{r.leaveConfirmCta}</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
     </div>
   );

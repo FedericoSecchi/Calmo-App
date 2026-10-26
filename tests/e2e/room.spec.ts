@@ -59,6 +59,7 @@ async function openRoomAsGuest(context: BrowserContext, code: string): Promise<P
   await page.evaluate(() => {
     try {
       localStorage.setItem("calmo_lang", "en");
+      localStorage.setItem("calmo_onboarding_complete", "1");
       localStorage.removeItem("calmo_room_name");
     } catch {
       /* ignore */

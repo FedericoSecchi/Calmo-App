@@ -28,6 +28,7 @@ test.describe("Auth timing", () => {
     await page.getByRole("button", { name: /create account/i }).click();
     await expect(page).toHaveURL(/\/app/, { timeout: 15_000 });
     const signUpMs = Date.now() - signUpStart;
+    await page.evaluate(() => localStorage.setItem("calmo_onboarding_complete", "1"));
 
     // Open a second tab in the same context so there's an active auth
     // listener in another frame when we sign out.
@@ -54,6 +55,7 @@ test.describe("Auth timing", () => {
     await expect(page2).toHaveURL(/\/app/, { timeout: 15_000 });
     const loginMs = Date.now() - loginStart;
 
+    await page2.evaluate(() => localStorage.setItem("calmo_onboarding_complete", "1"));
     await page2.goto("/app/settings");
     const deleteStart = Date.now();
     await page2.getByRole("button", { name: /^delete my account$/i }).click();

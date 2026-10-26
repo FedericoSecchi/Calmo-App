@@ -235,8 +235,8 @@ export const es: Dict = {
     presets: {
       light: {
         name: "Suave",
-        description: "60 min trabajo · 10 min descanso",
-        interval: "60 min",
+        description: "25 min trabajo · 5 min descanso",
+        interval: "25 min",
       },
       standard: {
         name: "Balanceado",
@@ -247,6 +247,11 @@ export const es: Dict = {
         name: "Profundo",
         description: "90 min trabajo · 10 min descanso",
         interval: "90 min",
+      },
+      custom: {
+        name: "Personalizado",
+        description: "{work} min trabajo · {rest} min descanso",
+        interval: "{work} min",
       },
     },
     timer: {
@@ -286,6 +291,8 @@ export const es: Dict = {
         pause: "Pausar",
         start: "Iniciar",
         skip: "Saltar",
+        reset: "Reiniciar fase",
+        resetConfirm: "¿Reiniciar?",
         focusLabel: "Foco",
         restLabel: "Pausa",
         tabCloseWarning:
@@ -294,6 +301,8 @@ export const es: Dict = {
       },
       settings: {
         rhythm: "Ritmo",
+        roomRhythm: "Ritmo de la sala",
+        roomRhythmHint: "Cambia el timer compartido para todos los de la sala.",
         rhythmUpdatedTitle: "Ritmo actualizado",
         rhythmUpdatedBody: "{name} activo",
         rhythmError: "No se pudo guardar el ritmo",
@@ -551,7 +560,10 @@ export const es: Dict = {
         lunchDescription: "Pausar recordatorios al mediodía",
       },
       goals: {
-        pain: { label: "Reducir dolor", description: "Aliviar molestias físicas" },
+        discomfort: {
+          label: "Prevenir molestias",
+          description: "Pausas cortas para moverte y reiniciar",
+        },
         productivity: {
           label: "Mejorar productividad",
           description: "Trabajar con más energía",
@@ -711,6 +723,14 @@ export const es: Dict = {
       leaveConfirmCta: "Sí, salir",
       myRoomsEmpty: "Aún no tienes salas. Crea una para enfocarte en equipo.",
       myRoomsOwner: "Dueño",
+      deleteCta: "Eliminar sala",
+      deleteConfirmTitle: "¿Eliminar esta sala?",
+      deleteConfirmBody: "Se borra para todos y se pierde su jardín.",
+      deleteConfirmCta: "Sí, eliminar",
+      deleteError: "No se pudo eliminar la sala. Prueba otra vez.",
+      deleteToastSelf: "Sala eliminada.",
+      deletedByOwner: "El dueño eliminó esta sala.",
+      removeFromMineCta: "Quitar de mi lista",
       createNewTitle: "Crear una sala nueva",
       createNewPlaceholder: "Nombre de la sala (opcional)",
       createNewSubmit: "Crear",
@@ -750,6 +770,73 @@ export const es: Dict = {
       toasts: {
         areaRequired: "Elige al menos una zona",
         saved: "Registro guardado",
+      },
+    },
+    tour: {
+      skip: "Omitir",
+      next: "Siguiente",
+      done: "Listo",
+      stepLabel: "{current} de {total}",
+      steps: {
+        timer: {
+          title: "Timer de foco y pausa",
+          description:
+            "El botón grande del centro inicia y pausa tu bloque de foco. Al terminar, pasa solo a una pausa.",
+        },
+        pip: {
+          title: "Ventana flotante",
+          description:
+            "Abre una ventana flotante para tener el timer siempre a la vista. Minimiza esta pestaña: si la cierras, el timer se detiene.",
+        },
+        exercises: {
+          title: "Ejercicios y respiración",
+          description:
+            "Usa las pausas para probar ejercicios cortos de movilidad o una guía de respiración. Todo opcional.",
+        },
+        hydration: {
+          title: "Agua y registro de molestias",
+          description:
+            "Cuenta los vasos de agua del día. El registro de molestias queda solo en este dispositivo.",
+        },
+        social: {
+          title: "Jardín y salas compartidas",
+          description:
+            "Tu foco hace crecer un jardincito. Comparte una sala de foco con amigos y el timer queda sincronizado.",
+        },
+      },
+    },
+    help: {
+      openAria: "Cómo funciona Calmo",
+      title: "Cómo funciona Calmo",
+      description: "Un recorrido rápido por las funciones.",
+      showTour: "Ver la guía de nuevo",
+      close: "Cerrar",
+      sections: {
+        timer: {
+          title: "Timer de foco y pausa",
+          body:
+            "Elige un ritmo (25/5, 45/5 o 90/10) y pulsa el botón grande. Calmo cambia solo entre foco y pausa y suena un aviso suave antes de que termine cada fase.",
+        },
+        pip: {
+          title: "Ventana flotante",
+          body:
+            "Una ventanita siempre visible mantiene el timer a la vista cuando cambias de pestaña. Mantén esta pestaña minimizada: si la cierras, el timer se detiene.",
+        },
+        exercises: {
+          title: "Movilidad y respiración",
+          body:
+            "Cuatro ejercicios cortos para cuello, hombros, muñecas y lumbar, y una guía de respiración. Están en la pestaña Ejercicios.",
+        },
+        hydration: {
+          title: "Agua y molestias",
+          body:
+            "Suma un vaso de agua con un toque. El registro de molestias es privado: queda solo en tu dispositivo, incluso con cuenta.",
+        },
+        social: {
+          title: "Jardín y salas de foco",
+          body:
+            "Cada sesión de foco hace crecer un jardín único. Crea una sala, comparte el link y el timer queda sincronizado con quienes se sumen.",
+        },
       },
     },
   },

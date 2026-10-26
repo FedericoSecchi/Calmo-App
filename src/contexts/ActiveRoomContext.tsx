@@ -12,7 +12,9 @@ import {
   type RoomInfo,
   type RoomPresence,
   type RoomPhase,
+  type RoomPresetId,
   type RoomRhythmId,
+  type RoomStatus,
   type RoomTimerState,
 } from "@/hooks/useFocusRoom";
 import {
@@ -55,10 +57,16 @@ export interface ActiveRoomContextValue {
   pause: () => void;
   resume: () => void;
   skip: () => void;
-  setRhythm: (rhythm: RoomRhythmId) => void;
+  resetPhase: () => void;
+  setRhythm: (rhythm: RoomPresetId) => void;
+  setCustomRhythm: (workMinutes: number, restMinutes: number) => void;
   logActivity: (kind: "exercise" | "water") => Promise<void>;
   rename: (name: string | null) => Promise<boolean>;
+  deleteRoom: () => Promise<boolean>;
   reconnectCount: number;
+  focusSec: number | null;
+  breakSec: number | null;
+  status: RoomStatus | null;
 }
 
 const ActiveRoomContext = createContext<ActiveRoomContextValue | null>(null);
@@ -183,8 +191,13 @@ export function ActiveRoomProvider({ children }: ProviderProps) {
   const pause = useCallback(() => live?.pause(), [live]);
   const resume = useCallback(() => live?.resume(), [live]);
   const skip = useCallback(() => live?.skip(), [live]);
+  const resetPhase = useCallback(() => live?.resetPhase(), [live]);
   const setRhythm = useCallback(
-    (rhythm: RoomRhythmId) => live?.setRhythm(rhythm),
+    (rhythm: RoomPresetId) => live?.setRhythm(rhythm),
+    [live],
+  );
+  const setCustomRhythm = useCallback(
+    (workMinutes: number, restMinutes: number) => live?.setCustomRhythm(workMinutes, restMinutes),
     [live],
   );
   const logActivity = useCallback(
@@ -194,6 +207,17 @@ export function ActiveRoomProvider({ children }: ProviderProps) {
     },
     [live],
   );
+  const deleteRoom = useCallback(async (): Promise<boolean> => {
+    if (!live) return false;
+    const ok = await live.deleteRoom();
+    if (ok) {
+      clearActiveRoom();
+      setActiveRoomState(null);
+      verifiedRef.current = null;
+    }
+    return ok;
+  }, [live]);
+
   const rename = useCallback(
     async (name: string | null) => {
       if (!live) return false;
@@ -228,6 +252,14 @@ export function ActiveRoomProvider({ children }: ProviderProps) {
       clearActiveRoom();
       setActiveRoomState(null);
       toast({ title: t.app.room.activeExpired });
+    }
+    if (live.status === "deleted") {
+      clearActiveRoom();
+      setActiveRoomState(null);
+      toast({ title: t.app.room.deletedByOwner });
+      if (location.pathname.startsWith("/app/room/")) {
+        navigate("/app", { replace: true });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live?.status, activeRoom?.code]);
@@ -284,6 +316,9 @@ export function ActiveRoomProvider({ children }: ProviderProps) {
       rhythmId: live?.state?.rhythmId ?? null,
       phase: live?.state?.phase ?? null,
       isRunning: live?.state?.isRunning ?? false,
+      focusSec: live?.state?.focusSec ?? null,
+      breakSec: live?.state?.breakSec ?? null,
+      status: live?.status ?? null,
       nickname,
       openActiveRoom,
       setActiveRoom,
@@ -292,9 +327,12 @@ export function ActiveRoomProvider({ children }: ProviderProps) {
       pause,
       resume,
       skip,
+      resetPhase,
       setRhythm,
+      setCustomRhythm,
       logActivity,
       rename,
+      deleteRoom,
       reconnectCount,
     };
     // We depend on the live hook's primitive outputs (presence array identity
@@ -314,9 +352,12 @@ export function ActiveRoomProvider({ children }: ProviderProps) {
     pause,
     resume,
     skip,
+    resetPhase,
     setRhythm,
+    setCustomRhythm,
     logActivity,
     rename,
+    deleteRoom,
     reconnectCount,
   ]);
   // react/no-unused-vars happy

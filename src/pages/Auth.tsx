@@ -61,9 +61,14 @@ const Auth = () => {
 
   const appTarget = searchParams.get("create_room") === "1" ? "/app?create_room=1" : "/app";
 
-  // Redirect only when we have a real session (not just a stale user object).
+  // Redirect when we have a real session or when the user is in guest mode.
+  // Someone already in /app shouldn't accidentally end up on /auth.
   useEffect(() => {
     if (user && session && !isGuest) {
+      navigate(appTarget, { replace: true });
+      return;
+    }
+    if (isGuest) {
       navigate(appTarget, { replace: true });
     }
   }, [user, session, isGuest, navigate, appTarget]);

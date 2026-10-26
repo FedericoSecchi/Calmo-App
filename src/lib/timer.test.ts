@@ -2,29 +2,33 @@ import { describe, it, expect } from "vitest";
 import { presets, type PresetId } from "@/contexts/FocusTimerContext";
 
 describe("presets", () => {
-  it("defines the three expected presets", () => {
+  it("defines the three expected presets in ascending intensity order", () => {
     const ids = presets.map((p) => p.id);
-    expect(ids).toContain("light");
-    expect(ids).toContain("standard");
-    expect(ids).toContain("focus");
+    expect(ids).toEqual(["light", "standard", "focus"]);
   });
 
-  it("light preset has correct timings", () => {
+  it("light preset is 25/5 (shortest)", () => {
     const light = presets.find((p) => p.id === "light")!;
-    expect(light.workMinutes).toBe(60);
-    expect(light.restMinutes).toBe(10);
+    expect(light.workMinutes).toBe(25);
+    expect(light.restMinutes).toBe(5);
   });
 
-  it("standard preset has correct timings", () => {
+  it("standard preset is 45/5", () => {
     const standard = presets.find((p) => p.id === "standard")!;
     expect(standard.workMinutes).toBe(45);
     expect(standard.restMinutes).toBe(5);
   });
 
-  it("focus preset has correct timings", () => {
+  it("focus preset is 90/10 (deepest)", () => {
     const focus = presets.find((p) => p.id === "focus")!;
     expect(focus.workMinutes).toBe(90);
     expect(focus.restMinutes).toBe(10);
+  });
+
+  it("the three preset work-durations are strictly ascending", () => {
+    const [a, b, c] = presets.map((p) => p.workMinutes);
+    expect(a).toBeLessThan(b);
+    expect(b).toBeLessThan(c);
   });
 
   it("all presets have an id and valid minute values", () => {

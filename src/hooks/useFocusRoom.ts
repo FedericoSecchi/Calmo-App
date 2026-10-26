@@ -5,9 +5,15 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 export const ROOM_FOCUS_SEC = 25 * 60;
 export const ROOM_BREAK_SEC = 5 * 60;
 
+export const ROOM_MIN_FOCUS_MIN = 5;
+export const ROOM_MAX_FOCUS_MIN = 120;
+export const ROOM_MIN_BREAK_MIN = 1;
+export const ROOM_MAX_BREAK_MIN = 30;
+
 export type RoomPhase = "focus" | "break";
 
-export type RoomRhythmId = "light" | "standard" | "focus";
+export type RoomPresetId = "light" | "standard" | "focus";
+export type RoomRhythmId = RoomPresetId | "custom";
 
 export interface RoomRhythm {
   id: RoomRhythmId;
@@ -15,19 +21,24 @@ export interface RoomRhythm {
   breakSec: number;
 }
 
-export const ROOM_RHYTHMS: Record<RoomRhythmId, RoomRhythm> = {
-  light: { id: "light", focusSec: 60 * 60, breakSec: 10 * 60 },
+export const ROOM_RHYTHMS: Record<RoomPresetId, RoomRhythm> = {
+  light: { id: "light", focusSec: 25 * 60, breakSec: 5 * 60 },
   standard: { id: "standard", focusSec: 45 * 60, breakSec: 5 * 60 },
   focus: { id: "focus", focusSec: 90 * 60, breakSec: 10 * 60 },
 };
 
-// Infer the rhythm from a focus-phase duration (in seconds). Falls back to
-// 25-minute pomodoro when nothing matches so pre-existing rooms keep working.
-function rhythmFromFocusSec(focusSec: number): RoomRhythm {
+// Infer the rhythm from a focus-phase duration. Pre-existing rooms (e.g. a
+// room created when "light" was 60 min) stay at their stored duration but
+// surface as the "custom" rhythm so the UI doesn't mis-label them.
+export function rhythmFromFocusSec(focusSec: number, breakSec?: number): RoomRhythm {
   for (const r of Object.values(ROOM_RHYTHMS)) {
     if (Math.abs(r.focusSec - focusSec) < 60) return r;
   }
-  return { id: "standard", focusSec: ROOM_FOCUS_SEC, breakSec: ROOM_BREAK_SEC };
+  return {
+    id: "custom",
+    focusSec: focusSec > 0 ? focusSec : ROOM_FOCUS_SEC,
+    breakSec: typeof breakSec === "number" && breakSec > 0 ? breakSec : ROOM_BREAK_SEC,
+  };
 }
 
 export interface RoomTimerState {
@@ -75,7 +86,7 @@ export interface RoomPresence {
   joinedAt: number;
 }
 
-export type RoomStatus = "loading" | "ready" | "not_found" | "realtime_error";
+export type RoomStatus = "loading" | "ready" | "not_found" | "realtime_error" | "deleted";
 
 export async function fetchRoomMeta(code: string): Promise<RoomMeta | null> {
   if (!isSupabaseConfigured) return null;
@@ -111,6 +122,12 @@ export async function renameRoom(code: string, name: string | null): Promise<boo
   return !error;
 }
 
+export async function deleteFocusRoom(code: string): Promise<boolean> {
+  if (!isSupabaseConfigured) return false;
+  const { error } = await supabase.rpc("delete_focus_room", { p_code: code });
+  return !error;
+}
+
 export async function createRoomWithName(theme: "zen" | "sky" | "companion", name: string | null): Promise<string | null> {
   if (!isSupabaseConfigured) return null;
   const { data, error } = await supabase.rpc("create_focus_room", { p_theme: theme });
@@ -126,6 +143,7 @@ interface Broadcast {
   state: { payload: RoomTimerState };
   request_state: { payload: { fromKey: string } };
   activity: { payload: { kind: "exercise" | "water"; byKey: string } };
+  room_deleted: { payload: { byKey: string } };
 }
 
 const initialState = (rhythm: RoomRhythm): RoomTimerState => ({
@@ -154,7 +172,11 @@ export function useFocusRoom(
   const [status, setStatus] = useState<RoomStatus>("loading");
   const [info, setInfo] = useState<RoomInfo | null>(null);
   const [presence, setPresence] = useState<RoomPresence[]>([]);
-  const initialRhythm = ROOM_RHYTHMS[options?.initialRhythmId ?? "standard"];
+  const initialRhythmKey: RoomPresetId =
+    options?.initialRhythmId && options.initialRhythmId !== "custom"
+      ? options.initialRhythmId
+      : "standard";
+  const initialRhythm = ROOM_RHYTHMS[initialRhythmKey];
   const [state, setState] = useState<RoomTimerState>(() => initialState(initialRhythm));
   const [remainingSec, setRemainingSec] = useState<number>(initialRhythm.focusSec);
 
@@ -236,8 +258,24 @@ export function useFocusRoom(
     }, true);
   }, [applyLocal]);
 
+  // Reset the current phase for everyone: keep phase and running state,
+  // snap time back to the phase's full duration.
+  const resetPhase = useCallback(() => {
+    applyLocal((prev) => {
+      const duration = prev.phase === "focus" ? prev.focusSec : prev.breakSec;
+      const now = Date.now();
+      return {
+        ...prev,
+        phaseStartAt: now,
+        durationSec: duration,
+        pausedRemainingSec: duration,
+        updatedAt: now,
+      };
+    }, true);
+  }, [applyLocal]);
+
   const setRhythm = useCallback(
-    (rhythmId: RoomRhythmId) => {
+    (rhythmId: RoomPresetId) => {
       applyLocal((prev) => {
         if (prev.isRunning) return prev;
         const r = ROOM_RHYTHMS[rhythmId];
@@ -249,6 +287,33 @@ export function useFocusRoom(
           phase: "focus",
           durationSec: r.focusSec,
           pausedRemainingSec: r.focusSec,
+          updatedAt: Date.now(),
+        };
+      }, true);
+    },
+    [applyLocal],
+  );
+
+  const setCustomRhythm = useCallback(
+    (workMinutes: number, restMinutes: number) => {
+      const workSec = Math.max(ROOM_MIN_FOCUS_MIN, Math.min(ROOM_MAX_FOCUS_MIN, Math.round(workMinutes))) * 60;
+      const restSec = Math.max(ROOM_MIN_BREAK_MIN, Math.min(ROOM_MAX_BREAK_MIN, Math.round(restMinutes))) * 60;
+      applyLocal((prev) => {
+        if (prev.isRunning) return prev;
+        // Snap to a preset if the user happens to type exactly one; that way
+        // the rhythm name stays accurate.
+        const match = Object.values(ROOM_RHYTHMS).find(
+          (p) => p.focusSec === workSec && p.breakSec === restSec,
+        );
+        const nextId: RoomRhythmId = match ? match.id : "custom";
+        return {
+          ...prev,
+          rhythmId: nextId,
+          focusSec: workSec,
+          breakSec: restSec,
+          phase: "focus",
+          durationSec: workSec,
+          pausedRemainingSec: workSec,
           updatedAt: Date.now(),
         };
       }, true);
@@ -377,7 +442,10 @@ export function useFocusRoom(
         if (!payload || typeof payload.updatedAt !== "number") return;
         if (payload.updatedAt < stateRef.current.updatedAt) return;
         // Backfill rhythm fields for any legacy payload that lacks them.
-        const r = rhythmFromFocusSec(payload.focusSec ?? payload.durationSec ?? ROOM_FOCUS_SEC);
+        const r = rhythmFromFocusSec(
+          payload.focusSec ?? payload.durationSec ?? ROOM_FOCUS_SEC,
+          payload.breakSec,
+        );
         setState({
           ...payload,
           rhythmId: payload.rhythmId ?? r.id,
@@ -394,6 +462,9 @@ export function useFocusRoom(
       })
       .on("broadcast", { event: "activity" }, () => {
         void refreshCounts();
+      })
+      .on("broadcast", { event: "room_deleted" }, () => {
+        setStatus("deleted");
       });
 
     channel.subscribe((status) => {
@@ -493,6 +564,26 @@ export function useFocusRoom(
     [code],
   );
 
+  // Owner-only. Broadcasts first so everyone else sees the room is gone
+  // instantly, then invokes the RPC. The RPC's cascade removes the server
+  // state; subsequent get_focus_room_meta calls return nothing.
+  const deleteRoom = useCallback(async (): Promise<boolean> => {
+    if (!code) return false;
+    const ch = channelRef.current;
+    if (ch) {
+      try {
+        await ch.send({
+          type: "broadcast",
+          event: "room_deleted",
+          payload: { byKey: myKeyRef.current },
+        });
+      } catch {
+        /* best-effort */
+      }
+    }
+    return deleteFocusRoom(code);
+  }, [code]);
+
   return {
     status,
     info,
@@ -503,9 +594,12 @@ export function useFocusRoom(
     pause,
     resume,
     skip,
+    resetPhase,
     setRhythm,
+    setCustomRhythm,
     logActivity,
     refreshCounts,
     rename,
+    deleteRoom,
   };
 }

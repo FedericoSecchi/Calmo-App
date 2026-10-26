@@ -1,6 +1,7 @@
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Leaf, Pause, Play, SkipForward, X } from "lucide-react";
+import { Leaf, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
 import { useFocusTimer } from "@/contexts/FocusTimerContext";
 import { useAppTimer } from "@/hooks/useAppTimer";
 import { useT } from "@/lib/i18n";
@@ -9,14 +10,50 @@ export const PipTimerWindow = () => {
   const {
     pipOpen,
     pipRoot,
-    closePipWindow,
     visualAlertEvent,
   } = useFocusTimer();
-  const { phaseLabel: currentPhase, remainingSec: timeRemaining, isRunning, toggle: toggleTimer, skip: skipToNextPhase, formatTime } = useAppTimer();
+  const {
+    phaseLabel: currentPhase,
+    remainingSec: timeRemaining,
+    isRunning,
+    toggle: toggleTimer,
+    skip: skipToNextPhase,
+    resetPhase,
+    formatTime,
+  } = useAppTimer();
   const { t } = useT();
   const prefersReduced = useReducedMotion();
+  const [resetArmed, setResetArmed] = useState(false);
+  const armTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Disarm the reset confirmation when the PiP closes so it doesn't come back
+  // armed next time the window opens.
+  useEffect(() => {
+    if (!pipOpen) {
+      setResetArmed(false);
+      if (armTimeoutRef.current) clearTimeout(armTimeoutRef.current);
+    }
+  }, [pipOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (armTimeoutRef.current) clearTimeout(armTimeoutRef.current);
+    };
+  }, []);
 
   if (!pipOpen || !pipRoot) return null;
+
+  const handleReset = () => {
+    if (resetArmed) {
+      setResetArmed(false);
+      if (armTimeoutRef.current) clearTimeout(armTimeoutRef.current);
+      resetPhase();
+      return;
+    }
+    setResetArmed(true);
+    if (armTimeoutRef.current) clearTimeout(armTimeoutRef.current);
+    armTimeoutRef.current = setTimeout(() => setResetArmed(false), 3000);
+  };
 
   const phaseLabel =
     currentPhase === "work" ? t.app.timer.pip.focusLabel : t.app.timer.pip.restLabel;
@@ -48,6 +85,7 @@ export const PipTimerWindow = () => {
           onClick={toggleTimer}
           className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
           aria-label={isRunning ? t.app.timer.pip.pause : t.app.timer.pip.start}
+          data-testid="pip-window-toggle"
         >
           {isRunning ? (
             <Pause className="h-4 w-4" aria-hidden />
@@ -60,16 +98,21 @@ export const PipTimerWindow = () => {
           onClick={skipToNextPhase}
           className="rounded-full border border-border px-4 py-2 text-sm font-medium"
           aria-label={t.app.timer.pip.skip}
+          data-testid="pip-skip"
         >
           <SkipForward className="h-4 w-4" aria-hidden />
         </button>
         <button
           type="button"
-          onClick={closePipWindow}
-          className="rounded-full border border-border px-4 py-2 text-sm font-medium"
-          aria-label={t.app.timer.pip.close}
+          onClick={handleReset}
+          className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+            resetArmed ? "border-primary text-primary bg-primary/5" : "border-border"
+          }`}
+          aria-label={resetArmed ? t.app.timer.pip.resetConfirm : t.app.timer.pip.reset}
+          title={resetArmed ? t.app.timer.pip.resetConfirm : t.app.timer.pip.reset}
+          data-testid="pip-reset"
         >
-          <X className="h-4 w-4" aria-hidden />
+          <RotateCcw className="h-4 w-4" aria-hidden />
         </button>
       </div>
       <p className="mt-1 px-2 text-center text-[10px] leading-tight text-muted-foreground">

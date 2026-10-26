@@ -14,6 +14,11 @@ test.describe("Guest flow", () => {
     await page.getByRole("button", { name: /without signing up|probar sin/i }).click();
     await page.waitForURL(/\/app/);
 
+    // Dismiss the first-visit welcome tour so the dashboard controls are
+    // reachable without any overlay in the way.
+    await page.evaluate(() => localStorage.setItem("calmo_onboarding_complete", "1"));
+    await page.reload();
+
     // Add a water glass via the +
     await page.locator('button[aria-label*="agregar vaso" i], button[aria-label*="add glass" i], button[aria-label*="agregar v" i]').first().click({ trial: false }).catch(async () => {
       // fallback: scroll into view and open hover group

@@ -2,9 +2,13 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { useSessionHint } from "@/lib/sessionHint";
 
 export const HeroSection = () => {
   const { t } = useT();
+  const hasSession = useSessionHint();
+  const primaryHref = hasSession ? "/app" : "/auth?mode=signup";
+  const primaryLabel = hasSession ? t.nav.openApp : t.hero.primaryCta;
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
       <div className="hero-bg" aria-hidden />
@@ -25,8 +29,8 @@ export const HeroSection = () => {
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button variant="hero" size="xl" asChild>
-              <Link to="/auth?mode=signup">
-                {t.hero.primaryCta}
+              <Link to={primaryHref} data-testid="hero-primary-cta">
+                {primaryLabel}
                 <ArrowRight className="h-5 w-5" />
               </Link>
             </Button>

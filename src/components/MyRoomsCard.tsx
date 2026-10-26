@@ -8,6 +8,7 @@ import {
   ArrowRight,
   DoorOpen,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -18,10 +19,21 @@ import { useT, format } from "@/lib/i18n";
 import { JOIN_PATHS } from "@/lib/i18n/types";
 import {
   createRoomWithName,
+  deleteFocusRoom,
   listMyRooms,
   renameRoom,
   type MyRoom,
 } from "@/hooks/useFocusRoom";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { readVisitedRooms, removeVisit, type VisitedRoomRecord } from "@/lib/activeRoomStorage";
 import {
   Dialog,
@@ -61,7 +73,7 @@ export const MyRoomsCard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isGuest, user } = useAuth();
-  const { activeRoom, info } = useActiveRoom();
+  const { activeRoom, info, leaveActiveRoom, deleteRoom: deleteActiveRoom } = useActiveRoom();
 
   const [serverRooms, setServerRooms] = useState<MyRoom[]>([]);
   const [visited, setVisited] = useState<VisitedRoomRecord[]>(() => readVisitedRooms());
@@ -187,8 +199,38 @@ export const MyRoomsCard = () => {
   };
 
   const forgetVisited = (code: string) => {
+    if (activeRoom?.code === code) {
+      leaveActiveRoom();
+    }
     removeVisit(code);
     setVisited(readVisitedRooms());
+  };
+
+  const [deleteTarget, setDeleteTarget] = useState<CombinedRoom | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const isActive = activeRoom?.code === deleteTarget.code;
+      // Deleting the active room goes through the live-channel path so other
+      // clients get the broadcast; non-active rooms just need the RPC.
+      const ok = isActive
+        ? await deleteActiveRoom()
+        : await deleteFocusRoom(deleteTarget.code);
+      if (!ok) {
+        toast({ title: r.deleteError, variant: "destructive" });
+        return;
+      }
+      removeVisit(deleteTarget.code);
+      setVisited(readVisitedRooms());
+      await refreshServer();
+      toast({ title: r.deleteToastSelf });
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const activeName = activeRoom?.name?.trim() || info?.name?.trim() || activeRoom?.code;
@@ -252,19 +294,31 @@ export const MyRoomsCard = () => {
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
                 {room.isOwner && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 px-2 text-xs"
-                    onClick={() => {
-                      setRenameTarget(room);
-                      setRenameValue(room.name ?? "");
-                    }}
-                    aria-label={r.renameEdit}
-                    data-testid={`rename-${room.code}`}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2 text-xs"
+                      onClick={() => {
+                        setRenameTarget(room);
+                        setRenameValue(room.name ?? "");
+                      }}
+                      aria-label={r.renameEdit}
+                      data-testid={`rename-${room.code}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2 text-xs text-destructive hover:text-destructive"
+                      onClick={() => setDeleteTarget(room)}
+                      aria-label={r.deleteCta}
+                      data-testid={`delete-${room.code}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
                 )}
                 {!room.isOwner && (
                   <Button
@@ -272,7 +326,8 @@ export const MyRoomsCard = () => {
                     variant="ghost"
                     className="h-8 px-2 text-xs text-muted-foreground"
                     onClick={() => forgetVisited(room.code)}
-                    aria-label={r.leaveConfirmCta}
+                    aria-label={r.removeFromMineCta}
+                    data-testid={`forget-${room.code}`}
                   >
                     <DoorOpen className="h-3.5 w-3.5" />
                   </Button>
@@ -355,6 +410,33 @@ export const MyRoomsCard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{r.deleteConfirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{r.deleteConfirmBody}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t.app.dashboard.newDayCancel}</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={deleting}
+                data-testid="confirm-delete-room"
+              >
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : r.deleteConfirmCta}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 };

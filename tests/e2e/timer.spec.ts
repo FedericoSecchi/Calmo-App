@@ -1,12 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
 
-// Boot a fresh guest session in English, bypassing landing and auth.
+// Boot a fresh guest session in English, bypassing landing and auth, and
+// pre-dismissing the welcome tour so dashboard controls are reachable.
 async function openGuestInEnglish(page: Page, path = "/app") {
   await page.goto("/");
   await page.evaluate(() => {
     try {
       localStorage.setItem("calmo_lang", "en");
       localStorage.setItem("calmo_guest_mode", "1");
+      localStorage.setItem("calmo_onboarding_complete", "1");
     } catch {
       /* ignore */
     }
@@ -56,5 +58,22 @@ test.describe("Timer visibility", () => {
     } else {
       await expect(button).toHaveCount(0);
     }
+  });
+
+  test("reset button on Home snaps the phase back to its full duration", async ({ page }) => {
+    await openGuestInEnglish(page, "/app");
+
+    // Start → the timer must briefly tick down from 45:00 (standard default).
+    await page.getByRole("button", { name: /^start$/i }).first().click();
+    await expect
+      .poll(() => page.locator("p.text-4xl").first().textContent(), { timeout: 10_000 })
+      .not.toMatch(/^\s*45:00\s*$/);
+
+    // Two-tap reset: first tap arms the button, the second confirms.
+    await page.getByTestId("reset-phase").click();
+    await page.getByTestId("reset-phase").click();
+
+    // The timer snaps back to 45:00 for the Balanced preset (standard default).
+    await expect(page.locator("p.text-4xl").first()).toHaveText(/^\s*45:00\s*$/, { timeout: 5_000 });
   });
 });
