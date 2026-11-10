@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,17 +23,22 @@ export const PricingSection = () => {
   const { t } = useT();
   const { status, error, submit } = useWaitlist(resolveSource(t.waitlist.sources.pricing));
   const [email, setEmail] = useState("");
+  const [trap, setTrap] = useState("");
+  // When the form became visible to the user (mount = hydration of the
+  // prerendered page). Used by the 3 s minimum-fill check in useWaitlist.
+  const shownAt = useRef(0);
   const hasSession = useSessionHint();
   const freeCtaHref = hasSession ? "/app" : "/auth?mode=signup";
   const freeCtaLabel = hasSession ? t.nav.openApp : t.pricing.free.cta;
 
   useEffect(() => {
+    shownAt.current = performance.now();
     track("pricing_view");
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await submit(email);
+    await submit(email, { trap, shownAt: shownAt.current });
   };
 
   return (
@@ -105,7 +110,21 @@ export const PricingSection = () => {
                   {t.pricing.pro.success}
                 </p>
               ) : (
-                <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
+                <form onSubmit={handleSubmit} className="relative flex flex-col sm:flex-row gap-2">
+                  {/* Trap field for bots: off-screen, hidden from assistive tech, not tabbable. */}
+                  <div aria-hidden="true" className="absolute -left-[9999px] top-0 h-px w-px overflow-hidden">
+                    <label>
+                      {t.pricing.pro.trapLabel}
+                      <input
+                        type="text"
+                        name="website"
+                        tabIndex={-1}
+                        autoComplete="off"
+                        value={trap}
+                        onChange={(e) => setTrap(e.target.value)}
+                      />
+                    </label>
+                  </div>
                   <Input
                     type="email"
                     required

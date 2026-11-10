@@ -3,7 +3,7 @@ import { useWaterLogs } from "./useWaterLogs";
 import { useBreakLogs } from "./useBreakLogs";
 import { usePainRecords } from "./usePainRecords";
 import { useManualBreakAdjustments } from "./useManualBreakAdjustments";
-import { calculateStreak, getTodayCount, getWeekCount, getLastPain } from "@/lib/stats";
+import { calculateStreakStatus, getTodayCount, getWeekCount, getLastPain } from "@/lib/stats";
 
 export const useDashboardStats = () => {
   const { logs: waterLogs } = useWaterLogs();
@@ -25,7 +25,7 @@ export const useDashboardStats = () => {
     const painLogs = painRecords.map((r) => ({ created_at: r.created_at }));
     // For streak: include both timer breaks and manual adjustments
     // (both count as valid habits)
-    const streak = calculateStreak(breakLogs, waterLogs, painLogs);
+    const streakStatus = calculateStreakStatus(breakLogs, waterLogs, painLogs);
     
     // Convert pain records to format expected by getLastPain
     const painForLast = painRecords.map((r) => ({
@@ -43,7 +43,8 @@ export const useDashboardStats = () => {
       timerBreaksToday,
       manualAdjustment: todayAdjustment,
       waterToday,
-      streak,
+      streak: streakStatus.days,
+      streakNeedsToday: streakStatus.needsToday,
       lastPain,
       breaksThisWeek,
       waterThisWeek,

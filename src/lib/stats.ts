@@ -12,39 +12,59 @@ export interface ActivityLog {
 /** Days shown under "This week": today plus the 6 previous local days. */
 export const WEEK_DAYS = 7;
 
+export interface StreakStatus {
+  /** Consecutive local days with activity (see calculateStreakStatus). */
+  days: number;
+  /** True when the streak is alive but today has no activity yet. */
+  needsToday: boolean;
+}
+
 /**
- * Calculate streak days from activity logs
- * 
- * Streak Rule:
- * - A day counts toward the streak if the user has at least 1 activity:
- *   - Completed break (from break_logs, including reminder-triggered breaks)
- *   - Logged water glass (from water_logs)
+ * Streak of consecutive local days with activity.
+ *
+ * A day counts if it has at least 1 activity:
+ *   - Completed break (break_logs, including reminder-triggered breaks and
+ *     manual adjustments logged there)
+ *   - Logged water glass (water_logs)
  *   - Logged pain record (local only; not persisted on the server)
- * 
- * Important: A completed REST phase from the Reminders timer logs a break to break_logs
- * with type="reminder", which counts as a valid habit for streak calculation.
- * 
- * Streak is consecutive days from today backwards (inclusive if today has activity).
+ *
+ * The run ends TODAY if today already has activity, otherwise it ends
+ * YESTERDAY: the streak only breaks after a full local day with no activity,
+ * so it doesn't read 0 every morning. In that second case `needsToday` is
+ * true (the UI nudges the user to keep it).
+ *
  * Days are the user's local calendar days (see localDay.ts).
  */
+export function calculateStreakStatus(
+  breakLogs: ActivityLog[],
+  waterLogs: ActivityLog[],
+  painLogs: ActivityLog[],
+  now: Date = new Date()
+): StreakStatus {
+  const activeDays = new Set<string>();
+  [...breakLogs, ...waterLogs, ...painLogs].forEach((log) => {
+    activeDays.add(localDayKey(log.created_at));
+  });
+
+  const today = localDayKey(now);
+  const todayActive = activeDays.has(today);
+  let day = todayActive ? today : addLocalDays(today, -1);
+  let days = 0;
+  while (activeDays.has(day)) {
+    days++;
+    day = addLocalDays(day, -1);
+  }
+  return { days, needsToday: days > 0 && !todayActive };
+}
+
+/** Streak length only. Same rule as calculateStreakStatus. */
 export function calculateStreak(
   breakLogs: ActivityLog[],
   waterLogs: ActivityLog[],
   painLogs: ActivityLog[],
   now: Date = new Date()
 ): number {
-  const activeDays = new Set<string>();
-  [...breakLogs, ...waterLogs, ...painLogs].forEach((log) => {
-    activeDays.add(localDayKey(log.created_at));
-  });
-
-  let streak = 0;
-  let day = localDayKey(now);
-  while (activeDays.has(day)) {
-    streak++;
-    day = addLocalDays(day, -1);
-  }
-  return streak;
+  return calculateStreakStatus(breakLogs, waterLogs, painLogs, now).days;
 }
 
 /**

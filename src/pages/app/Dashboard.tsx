@@ -22,6 +22,7 @@ import {
   Sparkles,
   RotateCcw,
   Check,
+  Flame,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
@@ -715,26 +716,26 @@ const Dashboard = () => {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
-            className="bg-card rounded-2xl p-4 border border-border/30 relative group"
+            className="bg-card rounded-2xl p-4 border border-border/30 relative"
           >
             <div className="flex items-center justify-between mb-2">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Target className="h-4 w-4 text-primary" />
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center -my-1.5 -mr-2">
                 <button
                   onClick={() => handleAdjustBreak(-1)}
-                  className="p-1 rounded-lg hover:bg-muted transition-colors"
+                  className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-muted transition-colors"
                   aria-label={d.removeBreakAria}
                 >
-                  <Minus className="h-3.5 w-3.5 text-primary" />
+                  <Minus className="h-4 w-4 text-primary" />
                 </button>
                 <button
                   onClick={() => handleAdjustBreak(1)}
-                  className="p-1 rounded-lg hover:bg-muted transition-colors"
+                  className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-muted transition-colors"
                   aria-label={d.addBreakAria}
                 >
-                  <Plus className="h-3.5 w-3.5 text-primary" />
+                  <Plus className="h-4 w-4 text-primary" />
                 </button>
               </div>
             </div>
@@ -755,7 +756,7 @@ const Dashboard = () => {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.12 }}
-            className="bg-card rounded-2xl p-4 border border-border/30 relative group"
+            className="bg-card rounded-2xl p-4 border border-border/30 relative"
           >
             <div className="flex items-center justify-between mb-2">
               <div
@@ -769,25 +770,25 @@ const Dashboard = () => {
                   }`}
                 />
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center -my-1.5 -mr-2">
                 <button
                   onClick={handleRemoveWater}
                   disabled={stats.waterToday === 0}
-                  className="p-1 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors"
+                  className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-muted disabled:opacity-30 transition-colors"
                   aria-label={d.removeWaterAria}
                 >
-                  <Minus className="h-3.5 w-3.5 text-primary" />
+                  <Minus className="h-4 w-4 text-primary" />
                 </button>
                 <button
                   onClick={handleAddWater}
                   disabled={isAddingWater}
-                  className="p-1 rounded-lg hover:bg-muted transition-colors"
+                  className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-muted transition-colors"
                   aria-label={d.addWaterAria}
                 >
                   {isAddingWater ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Plus className="h-3.5 w-3.5 text-primary" />
+                    <Plus className="h-4 w-4 text-primary" />
                   )}
                 </button>
               </div>
@@ -809,6 +810,35 @@ const Dashboard = () => {
               <p className="text-xs text-success mt-1 font-medium">{d.waterGoalReached}</p>
             )}
           </motion.div>
+
+          {stats.streak > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.14 }}
+              className="col-span-2 bg-card rounded-2xl px-4 py-3 border border-border/30 flex items-center gap-3"
+              data-testid="streak"
+            >
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Flame className="h-4 w-4 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-heading text-foreground" data-testid="streak-days">
+                    {stats.streak}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {stats.streak === 1 ? d.streakOne : d.streakMany}
+                  </span>
+                </p>
+                {stats.streakNeedsToday && (
+                  <p className="text-xs text-muted-foreground" data-testid="streak-keep">
+                    {d.streakKeepIt}
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
         </div>
       </section>
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { calculateStreak, getTodayCount, getWeekCount, getLastPain } from "./stats";
+import { calculateStreak, calculateStreakStatus, getTodayCount, getWeekCount, getLastPain } from "./stats";
 
 // Fixed local wall-clock times: every assertion holds in any TZ
 // (scripts/test-timezones.sh runs this file under several zones).
@@ -25,8 +25,8 @@ describe("calculateStreak", () => {
     expect(calculateStreak([at(2026, 11, 9)], [at(2026, 11, 8)], [at(2026, 11, 6)], now)).toBe(2);
   });
 
-  it("is 0 when today has no activity yet (existing rule, unchanged)", () => {
-    expect(calculateStreak([at(2026, 11, 8)], [], [], now)).toBe(0);
+  it("stays alive when today has no activity yet (ends yesterday)", () => {
+    expect(calculateStreak([at(2026, 11, 8)], [], [], now)).toBe(1);
   });
 
   it("handles multiple activities on same day", () => {
@@ -57,6 +57,55 @@ describe("calculateStreak", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 10, 9, 23, 30));
     expect(calculateStreak([at(2026, 11, 9, 22)], [at(2026, 11, 8, 23)], [])).toBe(2);
+  });
+});
+
+describe("calculateStreakStatus (ends today, or yesterday if today is still empty)", () => {
+  const now = new Date(2026, 10, 9, 18, 0); // Mon Nov 9, 2026 18:00 local
+  // n consecutive local days ending on `last` (inclusive), at hh:mm local.
+  const run = (last: [number, number, number], n: number, h = 12, min = 0) =>
+    Array.from({ length: n }, (_, i) => at(last[0], last[1], last[2] - i, h, min));
+
+  it("5 days in a row up to yesterday, nothing today → 5, needs today", () => {
+    expect(calculateStreakStatus(run([2026, 11, 8], 5), [], [], now)).toEqual({ days: 5, needsToday: true });
+  });
+
+  it("same 5 days plus activity today → 6, no nudge", () => {
+    const logs = run([2026, 11, 8], 5);
+    expect(calculateStreakStatus(logs, [at(2026, 11, 9, 9)], [], now)).toEqual({ days: 6, needsToday: false });
+  });
+
+  it("last active day was the day before yesterday → 0, no nudge", () => {
+    expect(calculateStreakStatus(run([2026, 11, 7], 4), [], [], now)).toEqual({ days: 0, needsToday: false });
+  });
+
+  it("activity only today → 1, no nudge", () => {
+    expect(calculateStreakStatus([], [at(2026, 11, 9, 8)], [], now)).toEqual({ days: 1, needsToday: false });
+  });
+
+  it("no activity at all → 0, no nudge", () => {
+    expect(calculateStreakStatus([], [], [], now)).toEqual({ days: 0, needsToday: false });
+  });
+
+  it("nightly owl: 23:30 every day, checked at 09:00 → full streak, needs today", () => {
+    const logs = run([2026, 11, 8], 7, 23, 30);
+    expect(calculateStreakStatus(logs, [], [], new Date(2026, 10, 9, 9, 0))).toEqual({ days: 7, needsToday: true });
+  });
+
+  it("just after midnight the streak is still alive", () => {
+    const logs = run([2026, 11, 8], 3, 23, 59);
+    expect(calculateStreakStatus(logs, [], [], new Date(2026, 10, 9, 0, 1))).toEqual({ days: 3, needsToday: true });
+  });
+
+  // The same nightly case pinned to real Argentina timestamps (23:30 ART =
+  // 02:30Z next day). Only meaningful when the process runs in that zone.
+  const inArgentina = /Buenos_Aires/.test(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  it.runIf(inArgentina)("Argentina: 23:30 ART each night, checked 09:00 ART → full streak", () => {
+    const logs = ["2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08", "2026-11-09"].map(
+      (d) => ({ created_at: `${d}T02:30:00.000Z` }) // = 23:30 ART of the previous day (Nov 3..8)
+    );
+    const nineAm = new Date("2026-11-09T12:00:00.000Z"); // 09:00 ART, Nov 9
+    expect(calculateStreakStatus(logs, [], [], nineAm)).toEqual({ days: 6, needsToday: true });
   });
 });
 

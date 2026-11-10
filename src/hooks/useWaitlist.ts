@@ -6,6 +6,20 @@ type Status = "idle" | "submitting" | "success" | "error";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Submissions faster than this after the form is shown are treated as bots. */
+export const WAITLIST_MIN_FILL_MS = 3000;
+
+export interface BotSignals {
+  /** Value of the hidden trap field. Real people never fill it. */
+  trap: string;
+  /** performance.now() when the form was shown. */
+  shownAt: number;
+}
+
+export function looksLikeBot({ trap, shownAt }: BotSignals, now: number): boolean {
+  return trap.trim() !== "" || now - shownAt < WAITLIST_MIN_FILL_MS;
+}
+
 // Insert via REST so the landing bundle doesn't need the supabase-js client.
 // Duplicates (23505) are treated as success — the user is on the list either
 // way.
@@ -35,7 +49,7 @@ export function useWaitlist(source: string = "pricing") {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const submit = async (email: string) => {
+  const submit = async (email: string, signals?: BotSignals) => {
     const trimmed = email.trim().toLowerCase();
     if (!EMAIL_RE.test(trimmed)) {
       setError(t.pricing.pro.invalid);
@@ -43,6 +57,11 @@ export function useWaitlist(source: string = "pricing") {
       return;
     }
     setError(null);
+    // Bots get the same success message, but nothing is stored or tracked.
+    if (signals && looksLikeBot(signals, performance.now())) {
+      setStatus("success");
+      return;
+    }
     setStatus("submitting");
     try {
       const result = await insertWaitlist(trimmed, lang, source);

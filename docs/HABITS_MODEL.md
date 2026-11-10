@@ -28,17 +28,22 @@ Un **hábito** en Calmo es cualquier actividad que contribuye al bienestar del u
 - Al menos 1 vaso de agua registrado
 - Al menos 1 registro de dolor
 
-**Implementación:**
-- Se combinan todos los logs (breaks, water, pain)
-- Se agrupan por fecha (día)
-- Se cuenta consecutivamente desde hoy hacia atrás
-- La racha se rompe cuando se encuentra un día sin actividades
+**Implementación** (`calculateStreakStatus` en `src/lib/stats.ts`, única fuente; el Dashboard y cualquier otra vista que muestre la racha la usan):
+- Se combinan todos los logs (breaks, water, pain) y se agrupan por **día local** del usuario (`src/lib/localDay.ts`).
+- La cuenta de días seguidos termina **HOY** si hoy ya tiene actividad, o termina **AYER** si hoy todavía no tiene.
+- La racha solo se corta cuando pasa **un día local completo sin actividad**. A la mañana, antes de registrar nada, la racha de ayer sigue viva.
+- Devuelve `{ days, needsToday }`. `needsToday` es `true` cuando la racha está viva (`days > 0`) pero hoy todavía no suma.
 
-**Ejemplo:**
-- Hoy: 2 pausas, 3 vasos → cuenta
-- Ayer: 1 registro de dolor → cuenta
-- Anteayer: 0 actividades → racha se detiene aquí
-- Resultado: Racha de 2 días
+**UI (Inicio):** se muestra el número de días seguidos. Si `needsToday`, debajo aparece una línea corta: "Haz una pausa hoy para mantenerla" / "Take a break today to keep it". Si hoy ya suma, no se muestra nada extra. Con racha 0 la tarjeta no se muestra.
+
+**Ejemplos** (consulta el lunes):
+- Lunes con actividad, domingo y sábado con actividad, viernes sin nada → 3, sin aviso.
+- Lunes todavía sin nada, domingo a martes previo con actividad (5 días) → 5, con aviso.
+- Lunes y domingo sin nada, sábado con actividad → 0 (pasó un día completo sin actividad).
+- Solo lunes con actividad → 1, sin aviso.
+- Actividad cada noche a las 23:30, consulta a las 09:00 → racha completa hasta ayer, con aviso.
+
+**Tests:** `src/lib/stats.test.ts`, que `scripts/test-timezones.sh` corre en UTC, Europe/Zagreb, America/Argentina/Buenos_Aires, America/Los_Angeles y Pacific/Auckland.
 
 ## Pausas de Hoy
 
