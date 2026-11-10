@@ -173,8 +173,33 @@ Bug: "which day is it" was computed in UTC (`toISOString()`) for stats, water, m
 - Remote e2e (`PLAYWRIGHT_BASE_URL=https://calmo.fit`, `--retries=0`): 35/35 passed in 2.0 min (auth-perf signup=1634 login=1682 signOut=1350 delete=1380 ms). Room codes: `9da20464`, `c99b2998`, `01b26118`, `1bbb8853`.
 - Pending: rows in `manual_break_adjustments` written before this change keep a UTC date (no migration, test data). Manual check on a real device in UTC-3 after 21:00 that water/breaks stay on today.
 
+## Streak, touch water, waitlist bots (2026-11-10)
+
+- **Streak survives the morning.** `calculateStreakStatus` in `src/lib/stats.ts` (single source; `calculateStreak` wraps it) counts consecutive local days ending today if today has activity, otherwise ending yesterday. It only breaks after a full local day without activity. What counts as activity is unchanged. Returns `{ days, needsToday }`. Home shows the streak (it was computed but never shown) with "Take a break today to keep it" / "Haz una pausa hoy para mantenerla" under the number when `needsToday`. Rule documented in `docs/HABITS_MODEL.md`.
+- **Water visible on phones.** Dashboard +/- for breaks and water were `opacity-0 group-hover:opacity-100`; now always visible, 44×44 hit areas, negative margins keep the card header at its height (checked at 375 px). Sweep of `src` for hover-only controls: the toast close button (`ui/toast.tsx`) was the other one → always visible, 44×44, toast `pr-12`. `ui/sidebar.tsx` (`md:opacity-0` menu action) is not used by the app; left as is.
+- **Waitlist bot filters** (`PricingSection.tsx` + `useWaitlist.ts`): hidden trap field `website` (off-screen, `aria-hidden` wrapper, `tabindex=-1`, `autocomplete=off`) and a 3 s minimum between form mount and submit. On either signal: same success message, no insert, no `waitlist_join`. Pure `looksLikeBot` unit-tested.
+- **metrics.sql:** every query now excludes test traffic (waitlist `source='e2e'` + `e2e+%@calmo.fit`; events with `?source=e2e` in path or `props.source='e2e'`; retention joins `auth.users` and drops `e2e+` accounts). Checked with `explain` against the project.
+- **Tests:** `stats.test.ts` new block (5 days to yesterday → 5 + nudge; + today → 6, no nudge; last day the day before yesterday → 0; only today → 1; 23:30 nightly at 09:00 → full; plus a real-ART-timestamp case that runs only under Buenos_Aires). New `tests/e2e/mobile-water.spec.ts` (375 px, `hasTouch`: Add glass visible, ≥44×44, tap 0→1, no horizontal scroll; streak nudge shows then hides after logging today). `waitlist.spec.ts` rewritten: trap / <3 s / human, asserted on the network (no POST to `/rest/v1/waitlist` for bots; human POST body `source:"e2e"`, 201 then 409).
+
+### Decisions
+
+- Streak card hidden when the streak is 0 (no new empty state).
+- Bot check runs after email validation, so an invalid email still shows the normal error.
+- "Shown" = component mount (hydration of the prerendered landing), not scroll into view.
+- No row check from the browser (anon can't read `waitlist`); e2e asserts no insert request. Confirmed in DB after the runs: 0 `e2e+trap-*`, 0 `e2e+fast-*` rows.
+
+### Verify runs (2026-11-10)
+
+- `scripts/verify.sh` → PASS (14/14) in 415 s. vitest 105 passed / 4 skipped. Timezones: UTC 54+4, Europe/Zagreb 55+3, America/Argentina/Buenos_Aires 56+2, America/Los_Angeles 54+4, Pacific/Auckland 55+3 (skips = zone-specific `it.runIf`). e2e 39/39. Lighthouse mobile `/` perf 98, `/es/` perf 99 (a11y/seo/bp 100) — not below 98/97.
+- Slow run (415 s vs ~182 s; e2e 5.7 min vs ~1.5): per-test timing (`--reporter=list`) showed the new tests add ~19 s; the rest is Supabase-backed specs (auth, rooms). A follow-up full e2e failed only `auth-perf` (delete=5948 ms vs 3000 ms gate); the spec alone 3× → delete 1139/1595/1513 ms. Transient Supabase latency, no auth code touched. Gate not loosened.
+- Production: commit `fc0f9c5` deployed (Deploy to GitHub Pages run 42868436193, success); `build-id=fc0f9c5758655aa63183126fbd1f44d6f86d5b0b` served after ~120 s; 22/22 sitemap URLs 200; `rpc/ping` → 1.
+- Remote e2e (`PLAYWRIGHT_BASE_URL=https://calmo.fit`, `--retries=0`): 39/39 in 2.1 min (auth-perf signup=1590 login=1529 signOut=911 delete=1111 ms).
+- Pending: if bots keep getting through, add Cloudflare Turnstile to the waitlist form. Waitlist had only `e2e` rows in the last 14 days when checked (the bot rows were apparently already removed), so the effect has to be measured from now on.
+
 ## Pending / manual review
 
+- Waitlist: Cloudflare Turnstile if bots keep getting through the trap + 3 s filters.
+- Streak nudge on a real phone in the morning (before any activity).
 - Visual QA of garden styles.
 - Visual QA of the Welcome tour and "¿Cómo funciona?" sheet on real mobile + desktop (375 / 768 / 1280).
 - PiP window reset-phase button in real Chromium — e2e only tests reset from Home; verify two-tap behavior and the reset button layout inside the PiP window manually.
