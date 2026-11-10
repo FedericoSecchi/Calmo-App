@@ -169,6 +169,9 @@ Bug: "which day is it" was computed in UTC (`toISOString()`) for stats, water, m
 - `scripts/verify.sh` → PASS in 182 s (all 14 steps). vitest 94 passed / 3 skipped; timezones: UTC 47+3 skipped, Europe/Zagreb 48+2, America/Argentina/Buenos_Aires 48+2, America/Los_Angeles 47+3, Pacific/Auckland 48+2 (skips are the zone-specific `it.runIf` cases). e2e 35/35. Lighthouse mobile `/` perf=98, `/es/` perf=97 (a11y/seo/bp 100; JS 113.6 KiB) — not below the previous 97/97.
 - One earlier full run failed only `auth-perf` (delete=3048 ms vs 3000 ms gate, Supabase latency spike under parallel load; this change touches no auth code). Re-run of that spec alone 3× → delete 1985/1512/1554 ms; next full verify PASS with delete=1193 ms. Threshold not loosened.
 - Room codes created by local e2e: `1d2c8fe6`, `3d66069b`, `c826e07f`, `ca1a0f32` (cleaned by the tests' `delete_focus_room` cleanup).
+- Production: commit `f6aad69` deployed (Deploy to GitHub Pages run 42843436176, success); `build-id=f6aad69fddc8a91bdb5f679f482e6889dd6f8653` served at calmo.fit; 22/22 sitemap URLs return 200; `rpc/ping` → 1.
+- Remote e2e (`PLAYWRIGHT_BASE_URL=https://calmo.fit`, `--retries=0`): 35/35 passed in 2.0 min (auth-perf signup=1634 login=1682 signOut=1350 delete=1380 ms). Room codes: `9da20464`, `c99b2998`, `01b26118`, `1bbb8853`.
+- Pending: rows in `manual_break_adjustments` written before this change keep a UTC date (no migration, test data). Manual check on a real device in UTC-3 after 21:00 that water/breaks stay on today.
 
 ## Pending / manual review
 
