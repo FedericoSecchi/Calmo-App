@@ -28,7 +28,8 @@ import {
 } from "@/lib/timerAudio";
 import { shouldFirePreEndWarning, formatTimerTitle } from "@/lib/timer";
 import { isPersonalTimerSuppressed } from "@/lib/timerSuppress";
-import { getLocalDayString, shouldAutoResetDay } from "@/lib/dayReset";
+import { shouldAutoResetDay } from "@/lib/dayReset";
+import { localDayKey } from "@/lib/localDay";
 import { track } from "@/lib/analytics";
 
 const TIMER_STORAGE_KEY = "calmo_reminder_timer_state";
@@ -276,7 +277,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
       const raw = localStorage.getItem(CYCLES_STORAGE_KEY);
       if (!raw) return 0;
       const parsed = JSON.parse(raw) as { day: string; count: number };
-      if (parsed.day !== getLocalDayString()) return 0;
+      if (parsed.day !== localDayKey()) return 0;
       return Number.isFinite(parsed.count) ? parsed.count : 0;
     } catch {
       return 0;
@@ -287,7 +288,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     try {
       localStorage.setItem(
         CYCLES_STORAGE_KEY,
-        JSON.stringify({ day: getLocalDayString(), count }),
+        JSON.stringify({ day: localDayKey(), count }),
       );
     } catch {
       /* ignore */
@@ -757,7 +758,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     setVisualAlertEvent(null);
     resetManualAdjustmentsToday();
     try {
-      localStorage.setItem(LAST_ACTIVE_DAY_KEY, getLocalDayString());
+      localStorage.setItem(LAST_ACTIVE_DAY_KEY, localDayKey());
     } catch {
       /* ignore */
     }
@@ -1041,7 +1042,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const current = getLocalDayString();
+    const current = localDayKey();
     let storedDay: string | null = null;
     try {
       storedDay = localStorage.getItem(LAST_ACTIVE_DAY_KEY);
@@ -1059,7 +1060,7 @@ export const FocusTimerProvider = ({ children }: FocusTimerProviderProps) => {
     }
 
     const checkDay = () => {
-      const now = getLocalDayString();
+      const now = localDayKey();
       let stored: string | null = null;
       try {
         stored = localStorage.getItem(LAST_ACTIVE_DAY_KEY);

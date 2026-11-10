@@ -136,7 +136,7 @@ Six user-reported fixes bundled into one ship:
 - **Welcome tour and the existing `/onboarding` wizard share the `calmo_onboarding_complete` key.** Either flow marks it, and either is skipped if the other has run. Both now call `track("onboarding_complete", { via, skipped })`. No new analytics event names (the `events` table only allows the existing list).
 - **Legacy rooms keep their stored duration and surface as "custom".** We considered re-interpreting legacy `light` rooms (60-min focus) as the new 25/5, but that would re-time an active session for people connected right now. Treating them as custom keeps the behavior the user saw and the UI honest.
 - **Reset is a two-tap confirm, not a dialog.** First tap arms the button (visual accent + aria label flips to "¿Reiniciar?"), 3 s window to confirm with a second tap. Dialogs felt heavy for a flow we expect people to hit frequently.
-- **Verify runs vitest under `TZ=UTC`.** The pre-existing `stats.test.ts` is timezone-dependent on days that straddle UTC midnight (DST transition week especially). CI runs UTC already; verify.sh now matches so a local run doesn't greenlight something CI would reject. Documented inline.
+- **(Superseded 2026-11-10, see "Days in local time") Verify runs vitest under `TZ=UTC`.** The pre-existing `stats.test.ts` is timezone-dependent on days that straddle UTC midnight (DST transition week especially). CI runs UTC already; verify.sh now matches so a local run doesn't greenlight something CI would reject. Documented inline.
 
 ### Verify runs (2026-10-26)
 
@@ -145,6 +145,30 @@ Six user-reported fixes bundled into one ship:
 - Remote e2e against production (`PLAYWRIGHT_BASE_URL=https://calmo.fit`): 35/35 passed in 1.8 min, no retries.
 - Production verify: `build-id=e0ed9fa7f3274f1aa309823fbf020a98ab948bf4` served at `calmo.fit`; all 18 canonical SEO / legal / join URLs return 200.
 - Local test rooms created: `6e325326`, `7c0b8782`, `903f1e04`. The `delete_focus_room` RPC runs in each test's cleanup; `focus_rooms.created_by ON DELETE CASCADE` handles the belt-and-suspenders path.
+
+## Days in local time (2026-11-10)
+
+Bug: "which day is it" was computed in UTC (`toISOString()`) for stats, water, manual break adjustments and the pain chart, but in local time for the timer's new-day reset. In UTC-3 everything after 21:00 counted for tomorrow, "today" reset at 21:00 and the streak could break; in Europe the same happened between 00:00 and 01:00/02:00. The previous pass hid it by forcing `TZ=UTC` in vitest.
+
+- **One concept of day:** `src/lib/localDay.ts` (`localDayKey`, `addLocalDays`, `parseLocalDayKey`). Stored timestamps stay UTC; they are grouped into the device's local calendar day. Removed `getTodayDateString` / `formatDateToYYYYMMDD` (utils) and `getLocalDayString` (dayReset).
+- **Where the day was UTC:** `src/lib/utils.ts` (`toISOString().split("T")`), `src/lib/stats.ts` (streak/today via those helpers + `new Date("YYYY-MM-DD")` + `setDate`), `src/hooks/useWaterLogs.ts` (`created_at.startsWith(today)` on the UTC string), `src/hooks/useManualBreakAdjustments.ts` (UTC date key, also written to `manual_break_adjustments.date`), `src/pages/app/Pain.tsx` (UTC grouping, and chart labels parsed as UTC midnight → previous day west of Greenwich). Garden today/week and the "This week" cards read from `stats.ts`, so they are fixed with it.
+- **"This week" = today + the 6 previous local days**, the same in stats, garden and the weekly cards. The old `getWeekCount` spanned 8 local days (7 days back at midnight + today); weekly totals can drop slightly.
+- **Guest avatar:** icon instead of "GU" (initials of the internal guest email), labelled from the dictionary (`app.settings.guestMode`: "Guest mode" / "Modo invitado").
+- **Tests:** `TZ=UTC` removed from verify.sh. New `scripts/test-timezones.sh` runs `localDay`, `stats`, `dayReset` and `garden/engine` tests under UTC, Europe/Zagreb, America/Argentina/Buenos_Aires, America/Los_Angeles, Pacific/Auckland; wired into verify.sh. Edge cases: 23:30 / 00:30 local, 3-night streak at 22:00–23:59, European DST end (Oct 25, 2026) and DST starts, day reset ⇔ today counter agreement walked every 15 min across DST and late nights. Fixed dates / fake timers only. Sanity check: reintroducing `toISOString().slice(0, 10)` in `localDayKey` fails 10 tests under Buenos_Aires.
+- **Timezone script hang:** the first run of `test-timezones.sh` hung ~17 h on the first zone with 4 vitest fork workers alive (it already used `vitest run`, not watch mode). Not reproducible afterwards (5 zones in ~5 s); most likely workers stalled while the machine was under heavy load. The script now has a hard per-zone limit (`perl alarm`, 180 s, `TZ_TEST_LIMIT_SEC`) and `--testTimeout=10000`, so a hang fails verify loudly instead of blocking it.
+- **Lighthouse hang:** the first full verify passed everything through e2e, then sat >30 min in `scripts/lighthouse-mobile.mjs` (preview answering 200, headless chromium listening on the fixed port 9222, no progress). The script had no deadline anywhere. Now: free DevTools port instead of 9222, `chromium.launch` timeout 60 s, `maxWaitForLoad` 60 s, hard per-URL limit (`LH_URL_TIMEOUT_MS`, 240 s) that fails the step, bounded `browser.close`, and an explicit `process.exit` so a stray CDP handle can't keep node alive.
+
+### Decisions
+
+- **No data migration** for `manual_break_adjustments.date`: rows written before this change keep their UTC date (few, test data). From now on the column holds the local day.
+- **Streak rule unchanged** (HABITS_MODEL.md): still 0 when today has no activity yet.
+- `toDateString()` in `FocusTimerContext` (screen-break state) and `usePWA` already used local time; left as is.
+
+### Verify runs (2026-11-10)
+
+- `scripts/verify.sh` → PASS in 182 s (all 14 steps). vitest 94 passed / 3 skipped; timezones: UTC 47+3 skipped, Europe/Zagreb 48+2, America/Argentina/Buenos_Aires 48+2, America/Los_Angeles 47+3, Pacific/Auckland 48+2 (skips are the zone-specific `it.runIf` cases). e2e 35/35. Lighthouse mobile `/` perf=98, `/es/` perf=97 (a11y/seo/bp 100; JS 113.6 KiB) — not below the previous 97/97.
+- One earlier full run failed only `auth-perf` (delete=3048 ms vs 3000 ms gate, Supabase latency spike under parallel load; this change touches no auth code). Re-run of that spec alone 3× → delete 1985/1512/1554 ms; next full verify PASS with delete=1193 ms. Threshold not loosened.
+- Room codes created by local e2e: `1d2c8fe6`, `3d66069b`, `c826e07f`, `ca1a0f32` (cleaned by the tests' `delete_focus_room` cleanup).
 
 ## Pending / manual review
 

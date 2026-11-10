@@ -19,6 +19,11 @@ test.describe("Guest flow", () => {
     await page.evaluate(() => localStorage.setItem("calmo_onboarding_complete", "1"));
     await page.reload();
 
+    // Guest avatar is an icon labelled "Guest mode", not initials of the internal email.
+    const avatar = page.getByTestId("nav-avatar");
+    await expect(avatar).toHaveAttribute("aria-label", /guest mode|modo invitado/i);
+    await expect(avatar).toHaveText("");
+
     // Add a water glass via the +
     await page.locator('button[aria-label*="agregar vaso" i], button[aria-label*="add glass" i], button[aria-label*="agregar v" i]').first().click({ trial: false }).catch(async () => {
       // fallback: scroll into view and open hover group

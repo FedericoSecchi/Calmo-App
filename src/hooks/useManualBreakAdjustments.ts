@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { getTodayDateString } from "@/lib/utils";
+import { localDayKey } from "@/lib/localDay";
 
 const STORAGE_KEY = "calmo_manual_break_adjustments";
 
@@ -56,7 +56,7 @@ export const useManualBreakAdjustments = () => {
   }, [adjustments, isGuest]);
 
   const getTodayAdjustment = () => {
-    const today = getTodayDateString();
+    const today = localDayKey();
     return adjustments[today] || 0;
   };
 
@@ -68,7 +68,7 @@ export const useManualBreakAdjustments = () => {
   };
 
   const adjustToday = (delta: number) => {
-    const today = getTodayDateString();
+    const today = localDayKey();
     setAdjustments((prev) => {
       const current = prev[today] || 0;
       const nextValue = current + delta;
@@ -79,7 +79,7 @@ export const useManualBreakAdjustments = () => {
   };
 
   const resetToday = () => {
-    const today = getTodayDateString();
+    const today = localDayKey();
     setAdjustments((prev) => {
       const copy = { ...prev };
       delete copy[today];

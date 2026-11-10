@@ -3,11 +3,14 @@
  * Used for computing streak and aggregating daily stats
  */
 
-import { formatDateToYYYYMMDD, getTodayDateString } from "./utils";
+import { addLocalDays, localDayKey } from "./localDay";
 
 export interface ActivityLog {
   created_at: string;
 }
+
+/** Days shown under "This week": today plus the 6 previous local days. */
+export const WEEK_DAYS = 7;
 
 /**
  * Calculate streak days from activity logs
@@ -22,69 +25,47 @@ export interface ActivityLog {
  * with type="reminder", which counts as a valid habit for streak calculation.
  * 
  * Streak is consecutive days from today backwards (inclusive if today has activity).
+ * Days are the user's local calendar days (see localDay.ts).
  */
 export function calculateStreak(
   breakLogs: ActivityLog[],
   waterLogs: ActivityLog[],
-  painLogs: ActivityLog[]
+  painLogs: ActivityLog[],
+  now: Date = new Date()
 ): number {
-  // Combine all logs and extract unique dates
-  const allDates = new Set<string>();
-  
+  const activeDays = new Set<string>();
   [...breakLogs, ...waterLogs, ...painLogs].forEach((log) => {
-    const date = formatDateToYYYYMMDD(log.created_at);
-    allDates.add(date);
+    activeDays.add(localDayKey(log.created_at));
   });
 
-  if (allDates.size === 0) {
-    return 0;
-  }
-
-  // Sort dates descending (most recent first)
-  const sortedDates = Array.from(allDates).sort().reverse();
-
-  // Calculate streak from today backwards
-  const today = getTodayDateString();
   let streak = 0;
-  const currentDate = new Date(today);
-
-  for (const dateStr of sortedDates) {
-    const logDate = formatDateToYYYYMMDD(dateStr);
-    const expectedDate = formatDateToYYYYMMDD(currentDate);
-
-    if (logDate === expectedDate) {
-      streak++;
-      // Move to previous day
-      currentDate.setDate(currentDate.getDate() - 1);
-    } else {
-      // Gap found, streak breaks
-      break;
-    }
+  let day = localDayKey(now);
+  while (activeDays.has(day)) {
+    streak++;
+    day = addLocalDays(day, -1);
   }
-
   return streak;
 }
 
 /**
- * Get count of activities for today
+ * Get count of activities for today (local day)
  */
-export function getTodayCount(logs: ActivityLog[]): number {
-  const today = getTodayDateString();
-  return logs.filter((log) => {
-    const logDate = formatDateToYYYYMMDD(log.created_at);
-    return logDate === today;
-  }).length;
+export function getTodayCount(logs: ActivityLog[], now: Date = new Date()): number {
+  const today = localDayKey(now);
+  return logs.filter((log) => localDayKey(log.created_at) === today).length;
 }
 
 /**
- * Get count of activities for the last 7 days
+ * Get count of activities for "this week": the last WEEK_DAYS local days,
+ * today included.
  */
-export function getWeekCount(logs: ActivityLog[]): number {
-  const now = new Date();
-  const weekAgo = new Date(now);
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  weekAgo.setHours(0, 0, 0, 0);
-  return logs.filter((log) => new Date(log.created_at) >= weekAgo).length;
+export function getWeekCount(logs: ActivityLog[], now: Date = new Date()): number {
+  const today = localDayKey(now);
+  const firstDay = addLocalDays(today, -(WEEK_DAYS - 1));
+  return logs.filter((log) => {
+    const day = localDayKey(log.created_at);
+    return day >= firstDay && day <= today;
+  }).length;
 }
 
 /**

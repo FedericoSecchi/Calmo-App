@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Check, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePainRecords } from "@/hooks/usePainRecords";
-import { formatDateToYYYYMMDD } from "@/lib/utils";
+import { localDayKey, parseLocalDayKey } from "@/lib/localDay";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useT } from "@/lib/i18n";
 import { track } from "@/lib/analytics";
@@ -35,7 +35,7 @@ const Pain = () => {
 
   const chartData = useMemo(() => {
     const grouped = records.reduce((acc, record) => {
-      const date = formatDateToYYYYMMDD(record.created_at);
+      const date = localDayKey(record.created_at);
       if (!acc[date]) acc[date] = { date, intensities: [] };
       acc[date].intensities.push(record.intensity);
       return acc;
@@ -44,13 +44,13 @@ const Pain = () => {
     return Object.entries(grouped)
       .map(([dateStr, { intensities }]) => ({
         dateStr,
-        date: new Date(dateStr).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", {
+        date: parseLocalDayKey(dateStr).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", {
           month: "short",
           day: "numeric",
         }),
         intensity: Math.round((intensities.reduce((a, b) => a + b, 0) / intensities.length) * 10) / 10,
       }))
-      .sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime())
+      .sort((a, b) => a.dateStr.localeCompare(b.dateStr))
       .map(({ date, intensity }) => ({ date, intensity }));
   }, [records, lang]);
 

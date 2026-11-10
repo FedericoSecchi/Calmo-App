@@ -10,7 +10,9 @@
 //   LH_MIN_A11Y    minimum accessibility score; default 100
 //   LH_MIN_SEO     minimum SEO score; default 95
 //   LH_MIN_BP      minimum best-practices score; default 95
+//   LH_URL_TIMEOUT_MS  hard limit per URL before failing (default: 240000)
 
+import { createServer } from "node:net";
 import { chromium } from "playwright";
 import lighthouse from "lighthouse";
 
@@ -24,17 +26,44 @@ const MIN_PERF = Number(process.env.LH_MIN_PERF ?? 0);
 const MIN_A11Y = Number(process.env.LH_MIN_A11Y ?? 100);
 const MIN_SEO = Number(process.env.LH_MIN_SEO ?? 95);
 const MIN_BP = Number(process.env.LH_MIN_BP ?? 95);
+const URL_TIMEOUT_MS = Number(process.env.LH_URL_TIMEOUT_MS ?? 240_000);
+
+// A free port for the DevTools protocol: a fixed 9222 can be held by a stale
+// browser, and Lighthouse then waits on it forever.
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const srv = createServer();
+    srv.once("error", reject);
+    srv.listen(0, "127.0.0.1", () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+// Lighthouse has no overall deadline; without this a stuck protocol
+// connection hangs verify.sh indefinitely.
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 async function run() {
+  const port = await freePort();
   const browser = await chromium.launch({
-    args: ["--remote-debugging-port=9222"],
+    args: [`--remote-debugging-port=${port}`],
+    timeout: 60_000,
   });
   const summaries = [];
   let failed = false;
   try {
     for (const url of urls) {
-      const result = await lighthouse(url, {
-        port: 9222,
+      const result = await withTimeout(lighthouse(url, {
+        port,
+        maxWaitForLoad: 60_000,
         output: "json",
         logLevel: "error",
         onlyCategories: ["performance", "accessibility", "best-practices", "seo"],
@@ -55,7 +84,7 @@ async function run() {
           downloadThroughputKbps: 1474.56,
           uploadThroughputKbps: 675,
         },
-      });
+      }), URL_TIMEOUT_MS, `lighthouse ${url}`);
       if (!result) throw new Error(`lighthouse returned no result for ${url}`);
       const categories = result.lhr.categories;
       const audits = result.lhr.audits;
@@ -80,7 +109,7 @@ async function run() {
       if (bp < MIN_BP) failed = true;
     }
   } finally {
-    await browser.close();
+    await withTimeout(browser.close(), 15_000, "browser.close").catch(() => {});
   }
 
   console.log("");
@@ -104,7 +133,11 @@ async function run() {
   }
 }
 
-run().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+run().then(
+  // Exit explicitly: a lingering Lighthouse/CDP handle must not keep node alive.
+  () => process.exit(0),
+  (err) => {
+    console.error(err);
+    process.exit(1);
+  },
+);

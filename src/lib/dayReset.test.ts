@@ -1,21 +1,49 @@
 import { describe, it, expect } from "vitest";
-import { getLocalDayString, shouldAutoResetDay } from "./dayReset";
+import { shouldAutoResetDay } from "./dayReset";
+import { localDayKey } from "./localDay";
+import { getTodayCount } from "./stats";
 
-describe("getLocalDayString", () => {
-  it("formats as YYYY-MM-DD in local time", () => {
-    const d = new Date(2026, 9, 25, 23, 59, 59); // Oct 25, 2026 local
-    expect(getLocalDayString(d)).toBe("2026-10-25");
-  });
+describe("day reset vs. today counter", () => {
+  // Walk every 15 min across Oct 24–27, 2026 (includes the European DST end)
+  // and Nov 8–10 (Argentina nights). Each step logs one activity; at the next
+  // step, the timer's "new day" reset must fire exactly when that activity
+  // stops counting for today.
+  const walk = (start: Date, hours: number) => {
+    const steps: Date[] = [];
+    for (let t = start.getTime(); t <= start.getTime() + hours * 3600_000; t += 15 * 60_000) {
+      steps.push(new Date(t));
+    }
+    return steps;
+  };
 
-  it("pads single-digit months and days", () => {
-    const d = new Date(2026, 0, 3, 12, 0, 0);
-    expect(getLocalDayString(d)).toBe("2026-01-03");
-  });
-
-  it("uses local time, not UTC — late evening on Jan 1 does not roll to Jan 2", () => {
-    const d = new Date(2026, 0, 1, 23, 30, 0);
-    expect(getLocalDayString(d)).toBe("2026-01-01");
-  });
+  for (const [label, start, hours] of [
+    ["DST week", new Date(2026, 9, 24, 0, 0), 96],
+    ["late nights", new Date(2026, 10, 8, 18, 0), 54],
+  ] as const) {
+    it(`reset and today-count agree (${label})`, () => {
+      const steps = walk(start, hours);
+      let resets = 0;
+      for (let i = 1; i < steps.length; i++) {
+        const prev = steps[i - 1];
+        const now = steps[i];
+        const reset = shouldAutoResetDay({
+          storedDay: localDayKey(prev),
+          currentDay: localDayKey(now),
+          isRunning: false,
+        });
+        const stillToday = getTodayCount([{ created_at: prev.toISOString() }], now) === 1;
+        expect(reset).toBe(!stillToday);
+        if (reset) {
+          resets++;
+          expect(now.getHours()).toBe(0);
+        }
+      }
+      // One reset per local midnight crossed (DST days are 23 or 25 h long).
+      const midnights = steps.slice(1).filter((d) => d.getHours() === 0 && d.getMinutes() === 0).length;
+      expect(midnights).toBeGreaterThan(0);
+      expect(resets).toBe(midnights);
+    });
+  }
 });
 
 describe("shouldAutoResetDay", () => {

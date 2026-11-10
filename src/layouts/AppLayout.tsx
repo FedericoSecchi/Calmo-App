@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, NavLink, useLocation } from "react-router-dom";
-import { Home, Dumbbell, Activity, Settings, Play, Pause, HelpCircle } from "lucide-react";
+import { Home, Dumbbell, Activity, Settings, Play, Pause, HelpCircle, User } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -84,8 +84,10 @@ const AppLayout = () => {
             <NavLink
               to="/app/settings"
               className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-sm touch-manipulation"
+              aria-label={isGuest ? t.app.settings.guestMode : undefined}
+              data-testid="nav-avatar"
             >
-              {getUserInitials()}
+              {isGuest ? <User className="h-5 w-5" aria-hidden="true" /> : getUserInitials()}
             </NavLink>
           </div>
         </div>
